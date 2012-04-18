@@ -23,6 +23,8 @@ class GTK_Main:
         hbox = gtk.HBox()
         vbox.pack_start(hbox, False)
         self.entry = gtk.Entry()
+        # Set default transform to identity
+        self.entry.set_text('1,0,0,0,1,0,0,0,1')
         hbox.add(self.entry)
         self.button = gtk.Button("Start")
         hbox.pack_start(self.button, False)
@@ -33,10 +35,12 @@ class GTK_Main:
         
         self.pipeline = gst.Pipeline('pipeline')
 
-        webcam_src = gst.element_factory_make('v4l2src', 'src')
-        webcam_src.set_property('device', '/dev/video0')
-        #webcam_src = gst.element_factory_make('dshowvideosrc', 'src')
-        #webcam_src.set_property('device-name', 'Microsoft LifeCam Studio')
+        if os.name == 'nt':
+            webcam_src = gst.element_factory_make('dshowvideosrc', 'src')
+            webcam_src.set_property('device-name', 'Microsoft LifeCam Studio')
+        else:
+            webcam_src = gst.element_factory_make('v4l2src', 'src')
+            webcam_src.set_property('device', '/dev/video0')
 
         # -- setup webcam_src --
         webcam_caps = gst.Caps('video/x-raw-yuv,width=640,height=480,framerate=30/1')
@@ -46,7 +50,7 @@ class GTK_Main:
         #Feed branch
         feed_queue = gst.element_factory_make('queue', 'feed_queue')
         warp_in_color = gst.element_factory_make('ffmpegcolorspace', 'warp_in_color')
-        warper = warp_perspective()
+        self.warper = warp_perspective()
         warp_out_color = gst.element_factory_make('ffmpegcolorspace', 'warp_out_color')
         cairo_color_out = gst.element_factory_make('ffmpegcolorspace', 'cairo_color_out')
         cairo_draw = CairoDrawBase('cairo_draw')
@@ -67,16 +71,16 @@ class GTK_Main:
 
         self.pipeline.add(webcam_src, webcam_caps_filter, video_rate, rate_caps_filter,
                 webcam_tee, feed_queue, video_sink, capture_queue, ffmpeg_color_space,
-                ffenc_mpeg4, avi_mux, file_sink, warper, warp_in_color, warp_out_color, cairo_draw, cairo_color_out)
+                ffenc_mpeg4, avi_mux, file_sink, self.warper, warp_in_color, warp_out_color, cairo_draw, cairo_color_out)
 
         record_warped = False
         if record_warped:
-            gst.element_link_many(webcam_src, webcam_caps_filter, warp_in_color, warper, warp_out_color, video_rate, rate_caps_filter, webcam_tee)
+            gst.element_link_many(webcam_src, webcam_caps_filter, warp_in_color, self.warper, warp_out_color, video_rate, rate_caps_filter, webcam_tee)
             gst.element_link_many(webcam_tee, feed_queue, cairo_draw, video_sink)
             gst.element_link_many(webcam_tee, capture_queue, ffmpeg_color_space, ffenc_mpeg4, avi_mux, file_sink)
         else:
             gst.element_link_many(webcam_src, webcam_caps_filter, video_rate, rate_caps_filter, webcam_tee)
-            gst.element_link_many(webcam_tee, feed_queue, warp_in_color, warper, warp_out_color, cairo_draw, cairo_color_out, video_sink)
+            gst.element_link_many(webcam_tee, feed_queue, warp_in_color, self.warper, warp_out_color, cairo_draw, cairo_color_out, video_sink)
             gst.element_link_many(webcam_tee, capture_queue, ffmpeg_color_space, ffenc_mpeg4, avi_mux, file_sink)
 
         bus = self.pipeline.get_bus()
@@ -88,6 +92,9 @@ class GTK_Main:
     def start_stop(self, w):
         if self.button.get_label() == "Start":
             self.button.set_label("Stop")
+            transform_str = self.entry.get_text()
+            if transform_str:
+                self.warper.set_property('transform_matrix', transform_str)
             self.pipeline.set_state(gst.STATE_PLAYING)
         else:
             self.pipeline.set_state(gst.STATE_NULL)

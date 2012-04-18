@@ -9,26 +9,26 @@ import cv
 
 
 def registered_element(class_):
-	"""Class decorator for registering a Python element.  Note that decorator
-	syntax was extended from functions to classes in Python 2.6, so until 2.6
-	becomes the norm we have to invoke this as a function instead of by
-	saying::
+    """Class decorator for registering a Python element.  Note that decorator
+    syntax was extended from functions to classes in Python 2.6, so until 2.6
+    becomes the norm we have to invoke this as a function instead of by
+    saying::
 
-		@gstlal_element_register
-		class foo(gst.Element):
-			...
-	
-	Until then, you have to do::
+        @gstlal_element_register
+        class foo(gst.Element):
+            ...
+    
+    Until then, you have to do::
 
-		class foo(gst.Element):
-			...
-		gstlal_element_register(foo)
-	"""
-	from inspect import getmodule
-	gobject.type_register(class_)
-	getmodule(class_).__gstelementfactory__ = (class_.__name__, gst.RANK_NONE,
+        class foo(gst.Element):
+            ...
+        gstlal_element_register(foo)
+    """
+    from inspect import getmodule
+    gobject.type_register(class_)
+    getmodule(class_).__gstelementfactory__ = (class_.__name__, gst.RANK_NONE,
             class_)
-	return class_
+    return class_
 
 
 @registered_element
@@ -42,6 +42,15 @@ class warp_perspective(gst.BaseTransform):
         __doc__.strip(),
         __author__
     )
+    __gproperties__ = {
+        'transform_matrix': (
+            gobject.TYPE_STRING,
+            'Transformation matrix',
+            'Comma-separated transformation matrix values',
+            '1,0,0,0,1,0,0,0,1',
+            gobject.PARAM_READWRITE | gobject.PARAM_CONSTRUCT
+        ),
+    }
     __gsttemplates__ = (
         gst.PadTemplate("sink",
             gst.PAD_SINK, gst.PAD_ALWAYS,
@@ -53,15 +62,48 @@ class warp_perspective(gst.BaseTransform):
         )
     )
 
+    default_transform = np.identity(3, dtype='float32')
+
+    @property
+    def transform_matrix(self):
+        value = getattr(self, '_transform_matrix', None)
+        if value is None:
+            self._transform_matrix = self.default_transform.copy()
+        return self._transform_matrix
+
+    @transform_matrix.setter
+    def transform_matrix(self, value):
+        assert(value.shape == (3, 3))
+        self._transform_matrix = value.copy()
+        self._transform_matrix_cv = cv.fromarray(self._transform_matrix)
+
+    @property
+    def transform_matrix_cv(self):
+        if not hasattr(self, '_transform_matrix_cv'):
+            self._transform_matrix_cv = cv.fromarray(self.transform_matrix)
+        return self._transform_matrix_cv
+
+    def do_set_property(self, prop, val):
+        """gobject->set_property virtual method."""
+        if prop.name == 'transform-matrix':
+            data = np.array([float(v.strip()) for v in val.split(',')],
+                    dtype='float32')
+            if len(data) != 9:
+                raise ValueError, 'Error parsing transform matrix.  Must be a '\
+                        'comma-separated list of real numbers'
+            data.shape = (3, 3)
+            self.transform_matrix = data
+
+    def do_get_property(self, prop):
+        """gobject->get_property virtual method."""
+        if prop.name == 'transform-matrix':
+            return ','.join([str(v)
+                    for v in self.transform_matrix.flatten()])
+
     def do_start(self):
         """GstBaseTransform->start virtual method."""
         self.history = []
-        transform_matrix = np.array([
-                [1.2681043148040771, 0.1850511133670807, 28.115493774414062],
-                [-0.03174028918147087, 1.4999419450759888, 181.2607421875],
-                [1.831687222875189e-05, 0.0006744748097844422, 1.0]],
-                        dtype='float32')
-        self.transform_matrix = cv.fromarray(transform_matrix)
+        value = self.transform_matrix
         return True
 
     def do_transform(self, inbuf, outbuf):
@@ -91,7 +133,7 @@ class warp_perspective(gst.BaseTransform):
         cv_img = array2cv(y)
 
         warped = cv.CreateMat(height, width, cv.CV_8UC3)
-        cv.WarpPerspective(cv_img, warped, self.transform_matrix,
+        cv.WarpPerspective(cv_img, warped, self.transform_matrix_cv,
                 flags=cv.CV_WARP_INVERSE_MAP)
         data = warped.tostring()
         outbuf[:len(data)] = data
