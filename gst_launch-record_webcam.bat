@@ -1,0 +1,2 @@
+:: gst-launch.exe ksvideosrc do-timestamp=1 num-buffers=90 ! video/x-raw-yuv,width=640,height=480,framerate=30/1 ! queue ! videorate ! video/x-raw-yuv,framerate=30/1 ! queue ! ffmpegcolorspace ! ffenc_mpeg4 ! avimux ! filesink location=temp.avi
+gst-launch.exe dshowvideosrc device-name="Microsoft LifeCam Studio" num-buffers=90 ! video/x-raw-yuv,width=640,height=480,framerate=30/1 ! queue ! videorate ! video/x-raw-yuv,framerate=30/1 ! queue ! ffmpegcolorspace ! ffenc_mpeg4 bitrate=1200000 ! avimux ! filesink location=temp.avi
