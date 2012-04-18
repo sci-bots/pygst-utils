@@ -1,7 +1,7 @@
 import logging
 
-import pygst
-pygst.require('0.10')
+#import pygst
+#pygst.require('0.10')
 import gst
 from path import path
 import gtk
@@ -31,14 +31,11 @@ def on_msg(bus, msg):
 
 pipeline = gst.Pipeline('pipeline')
 
-webcam_src = gst.element_factory_make('v4l2src', 'src')
-converter = gst.element_factory_make('audioconvert', 'converter')
-lame = gst.element_factory_make('lamemp3enc', 'lame')
-appsink = gst.element_factory_make('appsink', 'sink')
+#webcam_src = gst.element_factory_make('v4l2src', 'src')
+webcam_src = gst.element_factory_make('dshowvideosrc', 'src')
 
-#pipeline.add(webcam_src, decoder, lame, converter, appsink)
 # -- setup webcam_src --
-webcam_src.set_property('device', '/dev/video1')
+webcam_src.set_property('device-name', 'Microsoft LifeCam Studio')
 webcam_caps = gst.Caps('video/x-raw-yuv,width=640,height=480,framerate=30/1')
 webcam_caps_filter = gst.element_factory_make('capsfilter', 'caps_filter')
 webcam_caps_filter.set_property('caps', webcam_caps)
