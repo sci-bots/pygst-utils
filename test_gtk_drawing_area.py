@@ -19,7 +19,7 @@ class GTK_Main:
         window = gtk.Window(gtk.WINDOW_TOPLEVEL)
         window.set_title("Mpeg2-Player")
         window.set_default_size(640, 500)
-        window.connect("destroy", gtk.main_quit, "WM destroy")
+        window.connect("destroy", self.on_destroy)
         vbox = gtk.VBox()
         window.add(vbox)
         hbox = gtk.HBox()
@@ -107,7 +107,6 @@ class GTK_Main:
         self.aframe.add(self.movie_window)
         vbox.pack_start(self.aframe, False)
         window.show_all()
-        self.movie_view.run()
         self.window = window
 
     def start_stop(self, w):
@@ -120,7 +119,11 @@ class GTK_Main:
         else:
             self.pipeline.set_state(gst.STATE_NULL)
             self.button.set_label("Start")
-                        
+
+    def on_destroy(self, *args):
+        self.pipeline.set_state(gst.STATE_NULL)
+        gtk.main_quit()
+
 
 if __name__ == '__main__':        
     GTK_Main()

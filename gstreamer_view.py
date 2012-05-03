@@ -18,11 +18,12 @@ class GStreamerVideoView(SlaveView):
     """
     def __init__(self, pipeline):
         self.widget = gtk.DrawingArea()
+        self.widget.connect('realize', self.on_realize)
         self.sink = None
         self.window_xid = None
         self.pipeline = pipeline
 
-    def run(self):
+    def on_realize(self, widget):
         if not self.widget.window.has_native():
             # Note that this is required (at least for Windows) to ensure that the
             # DrawingArea has a native window assigned.  In Windows, if this is not
@@ -62,7 +63,6 @@ class GStreamerVideoView(SlaveView):
             if self.window_xid is None:
                 raise ValueError, 'Invalid window_xid.  Ensure the '\
                     'DrawingArea has been realized.'
-            print 'using window_xid: %s' % self.window_xid
             imagesink.set_xwindow_id(self.window_xid)
             imagesink.expose()
             gtk.gdk.threads_leave()
