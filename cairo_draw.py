@@ -36,7 +36,7 @@ def other_draw_on(buf):
         ctx.fill()
         ctx.set_source_rgba(1.0, 1.0, 1.0, 1.0)
         ctx.set_font_size(0.3 * radius)
-        txt = "Good Bye World"
+        txt = "Hello World"
         extents = ctx.text_extents(txt)
         ctx.move_to(center_x - extents[2]/2, center_y + extents[3]/2)
         ctx.text_path(txt)

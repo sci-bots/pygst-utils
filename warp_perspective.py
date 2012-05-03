@@ -5,7 +5,26 @@ import gst
 import gobject
 gobject.threads_init()
 import numpy as np
-import cv
+from opencv.safe_cv import cv
+
+
+def array2cv(a):
+    dtype2depth = {
+            'uint8':   cv.IPL_DEPTH_8U,
+            'int8':    cv.IPL_DEPTH_8S,
+            'uint16':  cv.IPL_DEPTH_16U,
+            'int16':   cv.IPL_DEPTH_16S,
+            'int32':   cv.IPL_DEPTH_32S,
+            'float32': cv.IPL_DEPTH_32F,
+            'float64': cv.IPL_DEPTH_64F,
+        }
+    try:
+        nChannels = a.shape[2]
+    except:
+        nChannels = 1
+    cv_im = cv.CreateMat(a.shape[0], a.shape[1], cv.CV_8UC3)
+    cv.SetData(cv_im, a.tostring(), a.shape[1] * nChannels)
+    return cv_im
 
 
 def registered_element(class_):
@@ -108,35 +127,20 @@ class warp_perspective(gst.BaseTransform):
 
     def do_transform(self, inbuf, outbuf):
         """GstBaseTransform->transform virtual method."""
-        def array2cv(a):
-            dtype2depth = {
-                    'uint8':   cv.IPL_DEPTH_8U,
-                    'int8':    cv.IPL_DEPTH_8S,
-                    'uint16':  cv.IPL_DEPTH_16U,
-                    'int16':   cv.IPL_DEPTH_16S,
-                    'int32':   cv.IPL_DEPTH_32S,
-                    'float32': cv.IPL_DEPTH_32F,
-                    'float64': cv.IPL_DEPTH_64F,
-                }
-            try:
-                nChannels = a.shape[2]
-            except:
-                nChannels = 1
-            cv_im = cv.CreateMat(a.shape[0], a.shape[1], cv.CV_8UC3)
-            cv.SetData(cv_im, a.tostring(), a.shape[1] * nChannels)
-            return cv_im
-
-        y = np.fromstring(inbuf.data, dtype='uint8', count=len(inbuf))
         struct = inbuf.caps[0]
         width, height = struct['width'], struct['height']
-        y.shape = (height, width, 3)
-        cv_img = array2cv(y)
-
+        cv_img = cv.CreateMat(height, width, cv.CV_8UC3)
+        cv.SetData(cv_img, inbuf.data, width * 3)
         warped = cv.CreateMat(height, width, cv.CV_8UC3)
         cv.WarpPerspective(cv_img, warped, self.transform_matrix_cv,
                 flags=cv.CV_WARP_INVERSE_MAP)
-        data = warped.tostring()
-        outbuf[:len(data)] = data
+#
+        #warped = cv.CreateMat(height, width, cv.CV_8UC3)
+        #cv.WarpPerspective(cv_img, warped, self.transform_matrix_cv,
+                #flags=cv.CV_WARP_INVERSE_MAP)
+        #data = warped.tostring()
+        #outbuf[:len(data)] = data
+        outbuf[:width * height * 3] = warped.tostring()[:]
 
         # Done!
         return gst.FLOW_OK

@@ -2,8 +2,8 @@
 
 import sys, os
 import pygtk, gtk, gobject
-import pygst
-pygst.require("0.10")
+#import pygst
+#pygst.require("0.10")
 import gst
 import gobject
 gobject.threads_init()
@@ -12,11 +12,42 @@ gtk.gdk.threads_init()
 from warp_perspective import warp_perspective
 from cairo_draw import CairoDrawBase
 
+
+class ViewerWidget(gtk.DrawingArea):
+    """
+    Widget for displaying properly GStreamer video sink
+
+    @ivar settings: The settings of the application.
+    @type settings: L{GlobalSettings}
+    """
+
+    __gsignals__ = {}
+
+    def __init__(self):
+        gtk.DrawingArea.__init__(self)
+        self.sink = None
+
+    def do_realize(self):
+        gtk.DrawingArea.do_realize(self)
+        # Note that this is required (at least for Windows) to ensure that the
+        # DrawingArea has a native window assigned.  In Windows, if this is not
+        # done, the video is written to the parent OS window (not a "window" in
+        # the traditional sense of an app, but rather in the window manager
+        # clipped rectangle sense).  The symptom is that the video will be drawn
+        # over top of any widgets, etc. in the parent window.
+        self.window.ensure_native()
+        if os.name == 'nt':
+            self.window_xid = self.window.handle
+        else:
+            self.window_xid = self.window.xid
+
+
+
 class GTK_Main:
     def __init__(self):
         window = gtk.Window(gtk.WINDOW_TOPLEVEL)
         window.set_title("Mpeg2-Player")
-        window.set_default_size(640, 480)
+        window.set_default_size(640, 500)
         window.connect("destroy", gtk.main_quit, "WM destroy")
         vbox = gtk.VBox()
         window.add(vbox)
@@ -29,9 +60,16 @@ class GTK_Main:
         self.button = gtk.Button("Start")
         hbox.pack_start(self.button, False)
         self.button.connect("clicked", self.start_stop)
-        self.movie_window = gtk.DrawingArea()
-        vbox.add(self.movie_window)
+        #self.movie_window = gtk.DrawingArea()
+        self.aframe = gtk.AspectFrame(xalign=0.5, yalign=1.0, ratio=4.0 / 3.0,
+                obey_child=False)
+        self.movie_window = ViewerWidget()
+        self.movie_window.set_size_request(640, 480)
+        self.aframe.add(self.movie_window)
+        vbox.pack_start(self.aframe, False)
         window.show_all()
+        self.movie_window.show()
+        self.window = window
         
         self.pipeline = gst.Pipeline('pipeline')
 
@@ -43,7 +81,7 @@ class GTK_Main:
             webcam_src.set_property('device', '/dev/video0')
 
         # -- setup webcam_src --
-        webcam_caps = gst.Caps('video/x-raw-yuv,width=640,height=480,framerate=30/1')
+        webcam_caps = gst.Caps('video/x-raw-yuv,width=640,height=480,framerate=15/1')
         webcam_caps_filter = gst.element_factory_make('capsfilter', 'caps_filter')
         webcam_caps_filter.set_property('caps', webcam_caps)
         webcam_tee = gst.element_factory_make('tee', 'webcam_tee')
@@ -52,12 +90,17 @@ class GTK_Main:
         warp_in_color = gst.element_factory_make('ffmpegcolorspace', 'warp_in_color')
         self.warper = warp_perspective()
         warp_out_color = gst.element_factory_make('ffmpegcolorspace', 'warp_out_color')
+        cairo_color_in = gst.element_factory_make('ffmpegcolorspace', 'cairo_color_in')
         cairo_color_out = gst.element_factory_make('ffmpegcolorspace', 'cairo_color_out')
         cairo_draw = CairoDrawBase('cairo_draw')
         video_sink = gst.element_factory_make('autovideosink', 'video_sink')
+        #video_sink = gst.element_factory_make('dshowvideosink', 'video_sink')
+        #video_sink = gst.element_factory_make('directdrawsink', 'video_sink')
+        #video_sink = gst.element_factory_make('gdkpixbufsink', 'video_sink')
+        
 
         video_rate = gst.element_factory_make('videorate', 'video_rate')
-        rate_caps = gst.Caps('video/x-raw-yuv,width=640,height=480,framerate=30/1')
+        rate_caps = gst.Caps('video/x-raw-yuv,width=640,height=480,framerate=15/1')
         rate_caps_filter = gst.element_factory_make('capsfilter', 'rate_caps_filter')
         rate_caps_filter.set_property('caps', rate_caps)
 
@@ -70,8 +113,14 @@ class GTK_Main:
         file_sink.set_property('location', 'temp.avi')
 
         self.pipeline.add(webcam_src, webcam_caps_filter, video_rate, rate_caps_filter,
-                webcam_tee, feed_queue, video_sink, capture_queue, ffmpeg_color_space,
-                ffenc_mpeg4, avi_mux, file_sink, self.warper, warp_in_color, warp_out_color, cairo_draw, cairo_color_out)
+                feed_queue, video_sink,
+                cairo_draw, cairo_color_out, cairo_color_in,
+
+                self.warper, warp_in_color, warp_out_color,
+
+                webcam_tee, 
+                capture_queue, ffmpeg_color_space, ffenc_mpeg4, avi_mux, file_sink,
+                )
 
         record_warped = False
         if record_warped:
@@ -79,8 +128,10 @@ class GTK_Main:
             gst.element_link_many(webcam_tee, feed_queue, cairo_draw, video_sink)
             gst.element_link_many(webcam_tee, capture_queue, ffmpeg_color_space, ffenc_mpeg4, avi_mux, file_sink)
         else:
+            #gst.element_link_many(webcam_src, webcam_caps_filter, video_rate, rate_caps_filter, feed_queue, cairo_color_in, cairo_draw, cairo_color_out, video_sink)
             gst.element_link_many(webcam_src, webcam_caps_filter, video_rate, rate_caps_filter, webcam_tee)
             gst.element_link_many(webcam_tee, feed_queue, warp_in_color, self.warper, warp_out_color, cairo_draw, cairo_color_out, video_sink)
+            #gst.element_link_many(webcam_tee, feed_queue, cairo_color_in, cairo_draw, cairo_color_out, video_sink)
             gst.element_link_many(webcam_tee, capture_queue, ffmpeg_color_space, ffenc_mpeg4, avi_mux, file_sink)
 
         bus = self.pipeline.get_bus()
@@ -88,7 +139,7 @@ class GTK_Main:
         bus.enable_sync_message_emission()
         bus.connect("message", self.on_message)
         bus.connect("sync-message::element", self.on_sync_message)
-        
+
     def start_stop(self, w):
         if self.button.get_label() == "Start":
             self.button.set_label("Stop")
@@ -119,7 +170,8 @@ class GTK_Main:
             imagesink = message.src
             imagesink.set_property("force-aspect-ratio", True)
             gtk.gdk.threads_enter()
-            imagesink.set_xwindow_id(self.movie_window.window.xid)
+            imagesink.set_xwindow_id(self.movie_window.window_xid)
+            imagesink.expose()
             gtk.gdk.threads_leave()
     
     def demuxer_callback(self, demuxer, pad):
@@ -129,6 +181,6 @@ class GTK_Main:
         elif pad.get_property("template").name_template == "audio_%02d":
             qa_pad = self.queuea.get_pad("sink")
             pad.link(qa_pad)
-        
-GTK_Main()
-gtk.main()
+if __name__ == '__main__':        
+    GTK_Main()
+    gtk.main()
