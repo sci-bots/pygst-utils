@@ -11,7 +11,7 @@ gtk.gdk.threads_init()
 
 from warp_perspective import warp_perspective
 from cairo_draw import CairoDrawBase
-from gstreamer_viewer import GStreamerVideoViewer
+from gstreamer_view import GStreamerVideoView
 
 
 class GTK_Main:
@@ -101,12 +101,13 @@ class GTK_Main:
             #gst.element_link_many(webcam_tee, feed_queue, cairo_color_in, cairo_draw, cairo_color_out, video_sink)
             gst.element_link_many(webcam_tee, capture_queue, ffmpeg_color_space, ffenc_mpeg4, avi_mux, file_sink)
 
-        self.movie_window = GStreamerVideoViewer(self.pipeline)
+        self.movie_view = GStreamerVideoView(self.pipeline)
+        self.movie_window = self.movie_view.widget
         self.movie_window.set_size_request(640, 480)
         self.aframe.add(self.movie_window)
         vbox.pack_start(self.aframe, False)
         window.show_all()
-        self.movie_window.show()
+        self.movie_view.run()
         self.window = window
 
     def start_stop(self, w):
