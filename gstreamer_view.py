@@ -25,12 +25,13 @@ class GStreamerVideoView(SlaveView):
 
     def on_realize(self, widget):
         if not self.widget.window.has_native():
-            # Note that this is required (at least for Windows) to ensure that the
-            # DrawingArea has a native window assigned.  In Windows, if this is not
-            # done, the video is written to the parent OS window (not a "window" in
-            # the traditional sense of an app, but rather in the window manager
-            # clipped rectangle sense).  The symptom is that the video will be drawn
-            # over top of any widgets, etc. in the parent window.
+            # Note that this is required (at least for Windows) to ensure that
+            # the DrawingArea has a native window assigned.  In Windows, if this
+            # is not done, the video is written to the parent OS window (not a
+            # "window" in the traditional sense of an app, but rather in the
+            # window manager clipped rectangle sense).  The symptom is that the
+            # video will be drawn over top of any widgets, etc. in the parent
+            # window.
             if not self.widget.window.ensure_native():
                 raise RuntimeError, 'Failed to get native window handle'
         if os.name == 'nt':
