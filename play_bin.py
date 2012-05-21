@@ -5,12 +5,17 @@ from cairo_draw import CairoDrawBase
 
 
 class PlayBin(gst.Bin):
-    def __init__(self, name, video_src):
+    def __init__(self, name, video_src, fps=15, width=640, height=480):
         super(PlayBin, self).__init__(name)
+
+        width_text = ',width=%s' % width
+        height_text = ',height=%s' % height
+        fps_text = ',framerate=%s/1' % fps
+        caps_str = 'video/x-raw-yuv%s%s%s' % (width_text, height_text, fps_text)
 
         self.video_src = video_src
         # -- setup video_src --
-        video_caps = gst.Caps('video/x-raw-yuv,width=640,height=480,framerate=15/1')
+        video_caps = gst.Caps(caps_str)
         video_caps_filter = gst.element_factory_make('capsfilter', 'caps_filter')
         video_caps_filter.set_property('caps', video_caps)
         video_tee = gst.element_factory_make('tee', 'video_tee')
@@ -25,7 +30,7 @@ class PlayBin(gst.Bin):
         video_sink = gst.element_factory_make('autovideosink', 'video_sink')
 
         video_rate = gst.element_factory_make('videorate', 'video_rate')
-        rate_caps = gst.Caps('video/x-raw-yuv,width=640,height=480,framerate=15/1')
+        rate_caps = gst.Caps(caps_str)
         rate_caps_filter = gst.element_factory_make('capsfilter', 'rate_caps_filter')
         rate_caps_filter.set_property('caps', rate_caps)
 

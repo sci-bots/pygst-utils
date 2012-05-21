@@ -9,8 +9,9 @@ import gobject
 gobject.threads_init()
 gtk.gdk.threads_init()
 
-from gstreamer_view import GStreamerVideoView
+from gstreamer_view import GStreamerVideoView, get_supported_dims
 from play_bin import PlayBin
+from record_bin import RecordBin
 
 
 class GTK_Main:
@@ -36,24 +37,21 @@ class GTK_Main:
         self.pipeline = gst.Pipeline('pipeline')
 
         if os.name == 'nt':
-            webcam_src = gst.element_factory_make('dshowvideosrc', 'src')
+            webcam_src = gst.element_factory_make('dshowvideosrc', 'webcam_src')
             webcam_src.set_property('device-name', 'Microsoft LifeCam Studio')
         else:
-            webcam_src = gst.element_factory_make('v4l2src', 'src')
+            webcam_src = gst.element_factory_make('v4l2src', 'webcam_src')
             webcam_src.set_property('device', '/dev/video1')
+        self.supported_dims = get_supported_dims(webcam_src)
+        print self.supported_dims
 
-        self.play_bin = PlayBin('play_bin', webcam_src)
-
-        #ffmpeg_color_space = gst.element_factory_make('ffmpegcolorspace', 'ffmpeg_color_space')
-        #ffenc_mpeg4 = gst.element_factory_make('ffenc_mpeg4', 'ffenc_mpeg40') 
-        #ffenc_mpeg4.set_property('bitrate', 1200000)
-        #avi_mux = gst.element_factory_make('avimux', 'avi_mux')
-        #file_sink = gst.element_factory_make('filesink', 'file_sink')
-        #file_sink.set_property('location', 'temp.avi')
+        self.play_bin = PlayBin('play_bin', webcam_src, width=800, height=600,
+                fps=15)
+        self.record_bin = RecordBin('record_bin', width=640, height=480)
 
         self.pipeline.add(self.play_bin)
-
-        #gst.element_link_many(ffmpeg_color_space, ffenc_mpeg4, avi_mux, file_sink)
+        self.pipeline.add(self.record_bin)
+        self.play_bin.link(self.record_bin)
 
         self.movie_view = GStreamerVideoView(self.pipeline)
         self.movie_window = self.movie_view.widget

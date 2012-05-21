@@ -12,6 +12,22 @@ gobject.threads_init()
 gtk.gdk.threads_init()
 
 
+def get_supported_dims(video_src):
+    '''
+    Given a video source element, return the supported video dimensions.
+    '''
+    original_state = video_src.get_state()[1]
+    if original_state != gst.STATE_READY:
+        video_src.set_state(gst.STATE_READY)
+    src_pad = video_src.get_pad('src')
+    supported_dims = set([(c['width'], c['height'])
+            for c in src_pad.get_caps() if 'width' in c.keys()])
+    video_src.set_state(gst.STATE_NULL)
+    if original_state != gst.STATE_READY:
+        video_src.set_state(original_state)
+    return supported_dims
+
+
 class GStreamerVideoView(SlaveView):
     """
     SlaveView for displaying GStreamer video sink
