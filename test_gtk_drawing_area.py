@@ -50,8 +50,6 @@ class GTK_Main:
         self.record_bin = RecordBin('record_bin', width=640, height=480)
 
         self.pipeline.add(self.play_bin)
-        self.pipeline.add(self.record_bin)
-        self.play_bin.link(self.record_bin)
 
         self.movie_view = GStreamerVideoView(self.pipeline)
         self.movie_window = self.movie_view.widget
@@ -67,9 +65,13 @@ class GTK_Main:
             transform_str = self.entry.get_text()
             if transform_str:
                 self.play_bin.warper.set_property('transform_matrix', transform_str)
+            self.pipeline.add(self.record_bin)
+            self.play_bin.link(self.record_bin)
             self.pipeline.set_state(gst.STATE_PLAYING)
         else:
             self.pipeline.set_state(gst.STATE_NULL)
+            self.play_bin.unlink(self.record_bin)
+            self.pipeline.remove(self.record_bin)
             self.button.set_label("Start")
 
     def on_destroy(self, *args):
