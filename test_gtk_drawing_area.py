@@ -9,93 +9,13 @@ import gobject
 gobject.threads_init()
 gtk.gdk.threads_init()
 
-from warp_perspective import warp_perspective
+from warp_perspective import warp_perspective, WarpBin
 from gstreamer_view import GStreamerVideoView, get_supported_dims
-from play_bin import PlayBin
-from record_bin import RecordBin
+from rated_bin import RatedBin
 
 
 #gst.debug_set_active(True)
 #gst.debug_set_default_threshold(3)
-
-class AutoRatedBin(gst.Bin):
-    def __init__(self, name, fps=15, width=640, height=480, video_src=None):
-        super(AutoRatedBin, self).__init__(name)
-
-        width_text = ',width=%s' % width
-        height_text = ',height=%s' % height
-        fps_text = ',framerate=%s/1' % fps
-        caps_str = 'video/x-raw-yuv'
-
-        if video_src is None:
-            video_src = gst.element_factory_make('autovideosrc', 'video_src')
-        caps = gst.Caps(caps_str)
-        caps_filter = gst.element_factory_make('capsfilter', 'caps_filter')
-        caps_filter.set_property('caps', caps)
-
-        caps_str = 'video/x-raw-yuv%s%s%s' % (width_text, height_text, fps_text)
-
-        rate_caps = gst.Caps(caps_str)
-        rate_caps_filter = gst.element_factory_make('capsfilter', 'rate_caps_filter')
-        rate_caps_filter.set_property('caps', rate_caps)
-        video_rate = gst.element_factory_make('videorate', 'video_rate')
-
-        self.add(video_src, caps_filter, video_rate, rate_caps_filter)
-        video_src.link(caps_filter)
-        caps_filter.link(video_rate)
-        video_rate.link(rate_caps_filter)
-
-        src_gp = gst.GhostPad("src", rate_caps_filter.get_pad('src'))
-        self.add_pad(src_gp)
-
-
-class RateBin(gst.Bin):
-    def __init__(self, name, fps=15, width=640, height=480):
-        super(RateBin, self).__init__(name)
-
-        width_text = ',width=%s' % width
-        height_text = ',height=%s' % height
-        fps_text = ',framerate=%s/1' % fps
-        #caps_str = 'video/x-raw-yuv%s%s' % (width_text, height_text)
-        caps_str = 'video/x-raw-yuv'
-
-        caps = gst.Caps(caps_str)
-        caps_filter = gst.element_factory_make('capsfilter', 'caps_filter')
-        caps_filter.set_property('caps', caps)
-
-        caps_str = 'video/x-raw-yuv%s%s%s' % (width_text, height_text, fps_text)
-
-        rate_caps = gst.Caps(caps_str)
-        rate_caps_filter = gst.element_factory_make('capsfilter', 'rate_caps_filter')
-        rate_caps_filter.set_property('caps', rate_caps)
-        video_rate = gst.element_factory_make('videorate', 'video_rate')
-
-        self.add(caps_filter, video_rate, rate_caps_filter)
-        caps_filter.link(video_rate)
-        video_rate.link(rate_caps_filter)
-
-        sink_gp = gst.GhostPad('sink', caps_filter.get_pad('sink'))
-        src_gp = gst.GhostPad("src", rate_caps_filter.get_pad('src'))
-        self.add_pad(sink_gp)
-        self.add_pad(src_gp)
-
-
-class WarpBin(gst.Bin):
-    def __init__(self, name, fps=15, width=640, height=480):
-        super(WarpBin, self).__init__(name)
-
-        warp_in_color = gst.element_factory_make('ffmpegcolorspace', 'warp_in_color')
-        self.warper = warp_perspective()
-        warp_out_color = gst.element_factory_make('ffmpegcolorspace', 'warp_out_color')
-
-        self.add(warp_in_color, self.warper, warp_out_color)
-        gst.element_link_many(warp_in_color, self.warper, warp_out_color)
-
-        sink_gp = gst.GhostPad('sink', warp_in_color.get_pad('sink'))
-        play_bin_src_gp = gst.GhostPad("src", warp_out_color.get_pad('src'))
-        self.add_pad(sink_gp)
-        self.add_pad(play_bin_src_gp)
-
 
 class GTK_Main:
     def __init__(self):
@@ -155,12 +75,12 @@ class GTK_Main:
         self.pipeline.set_state(gst.STATE_PLAYING)
 
     def get_auto_src(self):
-        return AutoRatedBin('video_src')
+        return RatedBin('video_src')
 
     def get_test_src(self):
         video_src = gst.element_factory_make('videotestsrc', 'video_src')
         video_src.set_property('pattern', 2)
-        return AutoRatedBin('video_src', video_src=video_src)
+        return RatedBin('video_src', video_src=video_src)
 
     def start_stop(self, w):
         if self.button.get_label() == "Start":
