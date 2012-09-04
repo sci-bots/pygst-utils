@@ -24,7 +24,8 @@ from gst_video_source_caps_query.video_mode_dialog import\
 from test_video import get_pipeline
 from pygtkhelpers.ui.extra_widgets import Filepath
 from pygtkhelpers.ui.dialogs import error
-from flatland import Form
+from flatland import Form, Integer
+from flatland.validation import ValueAtLeast, ValueAtMost
 
 
 #gst.debug_set_active(True)
@@ -59,14 +60,14 @@ class GTK_Main:
                          
         form = Form.of(get_video_mode_enum().using(
                 default=self.video_mode_keys[0]), Filepath.named('output_path')\
-                        .using(default=''))
+                        .using(default=''), Integer.named('bitrate').using(
+                                default=1200000, validators=[ValueAtLeast(
+                                        minimum=25000)], properties={'step': 100000}))
         self.video_mode_form_view = create_form_view(form)
-        self.video_mode_field = self.video_mode_form_view.form.fields[
-                'video_mode']
-        self.output_path_field = self.video_mode_form_view.form.fields[
-                'output_path']
+        for field in ['video_mode', 'output_path', 'bitrate']:
+            setattr(self, '%s_field' % field, self.video_mode_form_view.form\
+                    .fields[field])
         self.video_mode_field.proxy.connect('changed', self._on_mode_changed)
-        #self._on_mode_changed()
         self.video_source = None
         # Set default transform to identity
         hbox.add(self.video_mode_form_view.widget)
@@ -81,6 +82,10 @@ class GTK_Main:
         vbox.pack_start(self.aframe, False)
         window.show_all()
         self.window = window
+
+    @property
+    def bitrate(self):
+        return self.video_mode_form_view.form.fields['bitrate'].element.value
 
     @property
     def output_path(self):
@@ -111,7 +116,7 @@ class GTK_Main:
                 error('Please select a valid output filepath.')               
                 return
             self.pipeline = get_pipeline(self.get_video_source(),
-                    self.output_path)
+                    self.bitrate, self.output_path)
 
             self.movie_view = GStreamerVideoView(self.pipeline)
             self.movie_window = self.movie_view.widget
@@ -122,6 +127,7 @@ class GTK_Main:
             self.pipeline.set_state(gst.STATE_PLAYING)
             self.video_mode_field.proxy.widget.set_button_sensitivity(gtk.SENSITIVITY_OFF)
             self.output_path_field.widget.set_sensitive(False)
+            self.bitrate_field.widget.set_sensitive(False)
 
             self.button.set_label("Stop")
         else:
@@ -134,6 +140,7 @@ class GTK_Main:
             self.button.set_label("Start")
             self.video_mode_field.proxy.widget.set_button_sensitivity(gtk.SENSITIVITY_AUTO)
             self.output_path_field.widget.set_sensitive(True)
+            self.bitrate_field.widget.set_sensitive(True)
 
     def on_destroy(self, *args):
         if self.pipeline:

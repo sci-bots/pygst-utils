@@ -23,7 +23,7 @@ video_modes = GstVideoSourceManager.get_available_video_modes(
 device_key, devices = GstVideoSourceManager.get_video_source_configs()
 
 
-def get_pipeline(video_source, output_path):
+def get_pipeline(video_source, bitrate, output_path):
     pipeline = gst.Pipeline('pipeline')
 
     webcam_tee = gst.element_factory_make('tee', 'webcam_tee')
@@ -45,7 +45,7 @@ def get_pipeline(video_source, output_path):
         ffenc_mpeg4 = gst.element_factory_make('ffenc_mpeg4', 'ffenc_mpeg40') 
     else:
         ffenc_mpeg4 = gst.element_factory_make('xvidenc', 'ffenc_mpeg40') 
-    ffenc_mpeg4.set_property('bitrate', 1200000)
+    ffenc_mpeg4.set_property('bitrate', bitrate)
     avi_mux = gst.element_factory_make('avimux', 'avi_mux')
     file_sink = gst.element_factory_make('filesink', 'file_sink')
     file_sink.set_property('location', output_path)
