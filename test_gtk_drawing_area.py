@@ -61,8 +61,9 @@ class GTK_Main:
         form = Form.of(get_video_mode_enum().using(
                 default=self.video_mode_keys[0]), Filepath.named('output_path')\
                         .using(default=''), Integer.named('bitrate').using(
-                                default=1200000, validators=[ValueAtLeast(
-                                        minimum=25000)], properties={'step': 100000}))
+                                default=1200, validators=[ValueAtLeast(
+                                        minimum=25)], properties={'step': 100, 
+                                                'label': 'bitrate (Kbps)', }))
         self.video_mode_form_view = create_form_view(form)
         for field in ['video_mode', 'output_path', 'bitrate']:
             setattr(self, '%s_field' % field, self.video_mode_form_view.form\
@@ -85,7 +86,7 @@ class GTK_Main:
 
     @property
     def bitrate(self):
-        return self.video_mode_form_view.form.fields['bitrate'].element.value
+        return (self.video_mode_form_view.form.fields['bitrate'].element.value << 10)
 
     @property
     def output_path(self):
