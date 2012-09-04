@@ -2,9 +2,13 @@
 
 import sys, os
 import pygtk, gtk, gobject
-#import pygst
-#pygst.require("0.10")
-import gst
+try:
+    import pygst
+    pygst.require("0.10")
+except ImportError:
+    pass
+finally:
+    import gst
 import gobject
 gobject.threads_init()
 gtk.gdk.threads_init()
@@ -12,7 +16,12 @@ gtk.gdk.threads_init()
 from warp_perspective import warp_perspective, WarpBin
 from gstreamer_view import GStreamerVideoView, get_supported_dims
 from rated_bin import RatedBin
+from gst_video_source_caps_query.gst_video_source_caps_query import DeviceNotFound, GstVideoSourceManager, FilteredInput
 
+
+video_modes = GstVideoSourceManager.get_available_video_modes(
+        format_='YUY2')
+device_key, devices = GstVideoSourceManager.get_video_source_configs()
 
 #gst.debug_set_active(True)
 #gst.debug_set_default_threshold(3)
@@ -57,8 +66,9 @@ class GTK_Main:
 
         # Set recording format to mpeg4 avi
         avi_mux = gst.element_factory_make('avimux', 'avi_mux')
-        ffenc_mpeg4 = gst.element_factory_make('ffenc_mpeg4', 'ffenc_mpeg40') 
-        ffenc_mpeg4.set_property('bitrate', 1200000)
+        #ffenc_mpeg4 = gst.element_factory_make('ffenc_mpeg4', 'ffenc_mpeg40') 
+        ffenc_mpeg4 = gst.element_factory_make('xvidenc', 'ffenc_mpeg40') 
+        #ffenc_mpeg4.set_property('bitrate', 1200000)
 
         camera_bin.set_property('video-muxer', avi_mux)
         camera_bin.set_property('video-encoder', ffenc_mpeg4)
@@ -75,7 +85,13 @@ class GTK_Main:
         self.pipeline.set_state(gst.STATE_PLAYING)
 
     def get_auto_src(self):
-        return RatedBin('video_src')
+        #return RatedBin('video_src')
+        video_source = GstVideoSourceManager.get_video_source()
+        selected_mode = video_modes[0]
+        video_source.set_property(device_key, selected_mode['device'])
+        caps_str = GstVideoSourceManager.get_caps_string(selected_mode)
+        filtered_input = FilteredInput('video_src', caps_str, video_source)
+        return filtered_input
 
     def get_test_src(self):
         video_src = gst.element_factory_make('videotestsrc', 'video_src')
@@ -89,6 +105,7 @@ class GTK_Main:
                 self.pipeline.set_state(gst.STATE_NULL)
                 camera_bin.set_property('video-source', self.get_auto_src())
                 self.pipeline.set_state(gst.STATE_PLAYING)
+                self.record_enabled = True
             transform_str = self.entry.get_text()
             if transform_str:
                 warp_bin = camera_bin.get_by_name('warp_bin')
