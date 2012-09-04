@@ -54,11 +54,13 @@ class GStreamerVideoView(SlaveView):
             self.window_xid = self.widget.window.handle
         else:
             self.window_xid = self.widget.window.xid
+
         bus = self.pipeline.get_bus()
         bus.add_signal_watch()
         bus.enable_sync_message_emission()
         bus.connect("message", self.on_message)
         bus.connect("sync-message::element", self.on_sync_message)
+        return False
 
     def on_message(self, bus, message):
         t = message.type

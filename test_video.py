@@ -1,4 +1,5 @@
 import logging
+import platform
 
 #import pygst
 #pygst.require('0.10')
@@ -11,6 +12,7 @@ gtk.gdk.threads_init()
 # will messed our program up
 import gobject
 gobject.threads_init()
+from gst_video_source_caps_query.video_mode_dialog import select_video_source
 from gst_video_source_caps_query.gst_video_source_caps_query import \
         DeviceNotFound, GstVideoSourceManager, FilteredInput
 from gstreamer_view import GStreamerVideoView
@@ -21,19 +23,9 @@ video_modes = GstVideoSourceManager.get_available_video_modes(
 device_key, devices = GstVideoSourceManager.get_video_source_configs()
 
 
-def get_auto_src(name):
-    video_source = GstVideoSourceManager.get_video_source()
-    selected_mode = video_modes[0]
-    video_source.set_property(device_key, selected_mode['device'])
-    caps_str = GstVideoSourceManager.get_caps_string(selected_mode)
-    filtered_input = FilteredInput(name, caps_str, video_source)
-    return filtered_input
-
-
-def get_pipeline():
+def get_pipeline(video_source, output_path):
     pipeline = gst.Pipeline('pipeline')
 
-    webcam_src = get_auto_src('webcam_src')
     webcam_tee = gst.element_factory_make('tee', 'webcam_tee')
 
     #Feed branch
@@ -42,23 +34,26 @@ def get_pipeline():
 
     video_rate = gst.element_factory_make('videorate', 'video_rate')
     rate_caps = gst.Caps('video/x-raw-yuv,framerate=%(num)d/%(denom)s'\
-            % get_framerate(webcam_src))
+            % get_framerate(video_source))
     rate_caps_filter = gst.element_factory_make('capsfilter',
             'rate_caps_filter')
     rate_caps_filter.set_property('caps', rate_caps)
 
     capture_queue = gst.element_factory_make('queue', 'capture_queue')
     ffmpeg_color_space = gst.element_factory_make('ffmpegcolorspace', 'ffmpeg_color_space')
-    ffenc_mpeg4 = gst.element_factory_make('xvidenc', 'ffenc_mpeg40') 
+    if platform.system() == 'Linux':
+        ffenc_mpeg4 = gst.element_factory_make('ffenc_mpeg4', 'ffenc_mpeg40') 
+    else:
+        ffenc_mpeg4 = gst.element_factory_make('xvidenc', 'ffenc_mpeg40') 
     ffenc_mpeg4.set_property('bitrate', 1200000)
     avi_mux = gst.element_factory_make('avimux', 'avi_mux')
     file_sink = gst.element_factory_make('filesink', 'file_sink')
-    file_sink.set_property('location', 'temp.avi')
+    file_sink.set_property('location', output_path)
 
-    pipeline.add(webcam_src, video_rate, rate_caps_filter,
+    pipeline.add(video_source, video_rate, rate_caps_filter,
             webcam_tee, feed_queue, video_sink, capture_queue,
             ffmpeg_color_space, ffenc_mpeg4, avi_mux, file_sink)
-    gst.element_link_many(webcam_src, video_rate, rate_caps_filter, webcam_tee)
+    gst.element_link_many(video_source, video_rate, rate_caps_filter, webcam_tee)
     gst.element_link_many(webcam_tee, feed_queue, video_sink)
     gst.element_link_many(webcam_tee, capture_queue, ffmpeg_color_space, ffenc_mpeg4, avi_mux, file_sink)
 
