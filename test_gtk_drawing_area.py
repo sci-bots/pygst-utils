@@ -53,7 +53,7 @@ class GTK_Main:
         vbox = gtk.VBox()
         window.add(vbox)
         hbox = gtk.HBox()
-        vbox.pack_start(hbox, False)
+        vbox.pack_start(hbox, expand=False)
 
         get_video_mode_form(), 
 
@@ -79,7 +79,7 @@ class GTK_Main:
         
         self.pipeline = None
 
-        vbox.pack_start(self.aframe, False)
+        vbox.pack_start(self.aframe, expand=True)
         window.show_all()
         self.window = window
 
