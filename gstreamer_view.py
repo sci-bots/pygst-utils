@@ -21,12 +21,13 @@ class GStreamerVideoPipelineManager(gobject.GObject):
     """
     gsignal('video-started', object)
 
-    def __init__(self):
+    def __init__(self, force_aspect_ratio=True):
         super(GStreamerVideoPipelineManager, self).__init__()
         self.window_xid = None
         self.pipeline = None
         self.start_time = None
         self.sink = None
+        self.force_aspect_ratio = force_aspect_ratio
 
     @property
     def pipeline(self):
@@ -66,15 +67,13 @@ class GStreamerVideoPipelineManager(gobject.GObject):
             self.pipeline.set_state(gst.STATE_NULL)
     
     def on_sync_message(self, bus, message):
-        print '[on_sync_message]'
         if message.structure is None:
             return
         message_name = message.structure.get_name()
         if message_name == "prepare-xwindow-id":
             imagesink = message.src
-            #if self.force_aspect_ratio:
-            #imagesink.set_property("force-aspect-ratio", True)
-            print '  window XID: %s' % self.window_xid
+            if self.force_aspect_ratio:
+                imagesink.set_property("force-aspect-ratio", True)
             if self.window_xid is None:
                 raise ValueError, 'Invalid window_xid.  Ensure the '\
                     'DrawingArea has been realized.'
@@ -110,4 +109,3 @@ class GStreamerVideoView(SlaveView):
             self.window_xid = self.widget.window.handle
         else:
             self.window_xid = self.widget.window.xid
-        print '[GStreamerVideoView] on_realize: WINDOW_XID=%s' % self.window_xid

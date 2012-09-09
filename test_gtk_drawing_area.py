@@ -1,9 +1,5 @@
 #!/usr/bin/env python
 
-import stacktracer
-from path import path
-stacktracer.trace_start(path(__file__).parent.joinpath('trace.html'))
-                            
 import sys, os
 import pygtk, gtk, gobject
 try:
@@ -17,6 +13,7 @@ import gobject
 
 from warp_perspective import warp_perspective, WarpBin
 from gstreamer_view import GStreamerVideoView
+from test_pipeline_process import PipelineWindowProcess
 from rated_bin import RatedBin
 from gst_video_source_caps_query.gst_video_source_caps_query import\
         DeviceNotFound, GstVideoSourceManager, FilteredInput
@@ -127,18 +124,18 @@ class GTK_Main:
             self.aframe.add(self.movie_window)
             self.aframe.show_all()
 
-            #self.pipeline.set_state(gst.STATE_PLAYING)
+            self.p = PipelineWindowProcess(self.movie_view.window_xid)
+            self.p.start()
+
             self.video_mode_field.proxy.widget.set_button_sensitivity(gtk.SENSITIVITY_OFF)
             self.output_path_field.widget.set_sensitive(False)
             self.bitrate_field.widget.set_sensitive(False)
 
             self.button.set_label("Stop")
         else:
-            #self.pipeline.set_state(gst.STATE_NULL)
+            self.p.terminate()
             self.aframe.remove(self.movie_window)
             del self.movie_view
-            #del self.pipeline
-            #self.pipeline = None
             self.movie_view = None
             self.button.set_label("Start")
             self.video_mode_field.proxy.widget.set_button_sensitivity(gtk.SENSITIVITY_AUTO)
