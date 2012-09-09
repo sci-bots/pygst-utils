@@ -14,13 +14,14 @@ gobject.threads_init()
 gtk.gdk.threads_init()
 
 from warp_perspective import warp_perspective, WarpBin
-from gstreamer_view import GStreamerVideoView, get_supported_dims
+from gstreamer_view import GStreamerVideoView
 from rated_bin import RatedBin
 from gst_video_source_caps_query.gst_video_source_caps_query import\
         DeviceNotFound, GstVideoSourceManager, FilteredInput
 from gst_video_source_caps_query.video_mode_dialog import\
         FormViewDialog, create_form_view, get_video_mode_form,\
-        get_video_mode_map, create_video_source, get_video_mode_enum
+        get_video_mode_map, create_video_source, get_video_mode_enum,\
+        get_available_video_modes, get_video_source_configs
 from test_video import get_pipeline
 from pygtkhelpers.ui.extra_widgets import Filepath
 from pygtkhelpers.ui.dialogs import error
@@ -31,13 +32,14 @@ from flatland.validation import ValueAtLeast, ValueAtMost
 #gst.debug_set_active(True)
 #gst.debug_set_default_threshold(3)
 
+
 class GTK_Main:
     try:
-        video_modes = GstVideoSourceManager.get_available_video_modes(
+        video_modes = get_available_video_modes(
                 format_='YUY2')
         video_mode_map = get_video_mode_map(video_modes)
         video_mode_keys = sorted(video_mode_map.keys())
-        device_key, devices = GstVideoSourceManager.get_video_source_configs()
+        device_key, devices = get_video_source_configs()
         if video_mode_keys:
             _video_available = True
         else:

@@ -18,9 +18,9 @@ from gst_video_source_caps_query.gst_video_source_caps_query import \
 from gstreamer_view import GStreamerVideoView
 
 
-video_modes = GstVideoSourceManager.get_available_video_modes(
-        format_='YUY2')
-device_key, devices = GstVideoSourceManager.get_video_source_configs()
+#video_modes = GstVideoSourceManager.get_available_video_modes(
+        #format_='YUY2')
+#device_key, devices = GstVideoSourceManager.get_video_source_configs()
 
 
 def get_pipeline(video_source, bitrate, output_path):

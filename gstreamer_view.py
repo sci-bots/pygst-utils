@@ -1,9 +1,12 @@
 import os
+import time
+from datetime import datetime
 
 import gtk
 import gst
 import gobject
 from pygtkhelpers.delegates import SlaveView
+from pygtkhelpers.utils import gsignal
 
 
 # We need to call threads_init() to ensure correct gtk operation with
@@ -12,32 +15,21 @@ gobject.threads_init()
 gtk.gdk.threads_init()
 
 
-def get_supported_dims(video_src):
-    '''
-    Given a video source element, return the supported video dimensions.
-    '''
-    original_state = video_src.get_state()[1]
-    if original_state != gst.STATE_READY:
-        video_src.set_state(gst.STATE_READY)
-    src_pad = video_src.get_pad('src')
-    supported_dims = set([(c['width'], c['height'])
-            for c in src_pad.get_caps() if 'width' in c.keys()])
-    video_src.set_state(gst.STATE_NULL)
-    if original_state != gst.STATE_READY:
-        video_src.set_state(original_state)
-    return supported_dims
-
-
 class GStreamerVideoView(SlaveView):
     """
     SlaveView for displaying GStreamer video sink
     """
-    def __init__(self, pipeline):
+    gsignal('video-started', object)
+
+    def __init__(self, pipeline, force_aspect_ratio=True):
+        super(GStreamerVideoView, self).__init__()
         self.widget = gtk.DrawingArea()
         self.widget.connect('realize', self.on_realize)
-        self.sink = None
         self.window_xid = None
         self.pipeline = pipeline
+        self.force_aspect_ratio = force_aspect_ratio
+        self.start_time = None
+        self.sink = None
 
     def on_realize(self, widget):
         if not self.widget.window.has_native():
@@ -55,17 +47,38 @@ class GStreamerVideoView(SlaveView):
         else:
             self.window_xid = self.widget.window.xid
 
-        bus = self.pipeline.get_bus()
-        bus.add_signal_watch()
-        bus.enable_sync_message_emission()
-        bus.connect("message", self.on_message)
-        bus.connect("sync-message::element", self.on_sync_message)
-        return False
+    @property
+    def pipeline(self):
+        if not hasattr(self, '_pipeline'):
+            self._pipeline = None
+        return self._pipeline
+
+    @pipeline.setter
+    def pipeline(self, pipeline):
+        if hasattr(self, '_pipeline') and self._pipeline:
+            self._pipeline.set_state(gst.STATE_NULL)
+            if hasattr(self, 'sink') and self.sink:
+                self.sink.set_xwindow_id(0)
+                del self.sink
+            del self._pipeline
+        self._pipeline = pipeline
+        if self._pipeline:
+            bus = self._pipeline.get_bus()
+            bus.add_signal_watch()
+            bus.enable_sync_message_emission()
+            bus.connect("message", self.on_message)
+            bus.connect("sync-message::element", self.on_sync_message)
 
     def on_message(self, bus, message):
         t = message.type
         if t == gst.MESSAGE_EOS:
             self.pipeline.set_state(gst.STATE_NULL)
+        elif t == gst.MESSAGE_STATE_CHANGED:
+            if message.src == self.pipeline\
+                    and message.structure['new-state'] == gst.STATE_PLAYING:
+                self.start_time = datetime.fromtimestamp(
+                    self.pipeline.get_clock().get_time() * 1e-9)
+                self.emit('video-started', self.start_time)
         elif t == gst.MESSAGE_ERROR:
             err, debug = message.parse_error()
             print "Error: %s" % err, debug
@@ -77,11 +90,13 @@ class GStreamerVideoView(SlaveView):
         message_name = message.structure.get_name()
         if message_name == "prepare-xwindow-id":
             imagesink = message.src
-            imagesink.set_property("force-aspect-ratio", True)
+            if self.force_aspect_ratio:
+                imagesink.set_property("force-aspect-ratio", True)
             gtk.gdk.threads_enter()
             if self.window_xid is None:
                 raise ValueError, 'Invalid window_xid.  Ensure the '\
                     'DrawingArea has been realized.'
+            
             imagesink.set_xwindow_id(self.window_xid)
             imagesink.expose()
             gtk.gdk.threads_leave()
