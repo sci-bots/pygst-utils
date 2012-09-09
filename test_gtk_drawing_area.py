@@ -1,5 +1,9 @@
 #!/usr/bin/env python
 
+import stacktracer
+from path import path
+stacktracer.trace_start(path(__file__).parent.joinpath('trace.html'))
+                            
 import sys, os
 import pygtk, gtk, gobject
 try:
@@ -10,8 +14,6 @@ except ImportError:
 finally:
     import gst
 import gobject
-gobject.threads_init()
-gtk.gdk.threads_init()
 
 from warp_perspective import warp_perspective, WarpBin
 from gstreamer_view import GStreamerVideoView
@@ -57,9 +59,6 @@ class GTK_Main:
         hbox = gtk.HBox()
         vbox.pack_start(hbox, expand=False)
 
-        get_video_mode_form(), 
-
-                         
         form = Form.of(get_video_mode_enum().using(
                 default=self.video_mode_keys[0]), Filepath.named('output_path')\
                         .using(default=''), Integer.named('bitrate').using(
@@ -118,27 +117,28 @@ class GTK_Main:
             if not self.output_path:
                 error('Please select a valid output filepath.')               
                 return
-            self.pipeline = get_pipeline(self.get_video_source(),
-                    self.bitrate, self.output_path)
+            #self.pipeline = get_pipeline(self.get_video_source(),
+                    #self.bitrate, self.output_path)
 
-            self.movie_view = GStreamerVideoView(self.pipeline)
+            #self.movie_view = GStreamerVideoView(self.pipeline)
+            self.movie_view = GStreamerVideoView()
             self.movie_window = self.movie_view.widget
             self.movie_window.set_size_request(640, 480)
             self.aframe.add(self.movie_window)
             self.aframe.show_all()
 
-            self.pipeline.set_state(gst.STATE_PLAYING)
+            #self.pipeline.set_state(gst.STATE_PLAYING)
             self.video_mode_field.proxy.widget.set_button_sensitivity(gtk.SENSITIVITY_OFF)
             self.output_path_field.widget.set_sensitive(False)
             self.bitrate_field.widget.set_sensitive(False)
 
             self.button.set_label("Stop")
         else:
-            self.pipeline.set_state(gst.STATE_NULL)
+            #self.pipeline.set_state(gst.STATE_NULL)
             self.aframe.remove(self.movie_window)
             del self.movie_view
-            del self.pipeline
-            self.pipeline = None
+            #del self.pipeline
+            #self.pipeline = None
             self.movie_view = None
             self.button.set_label("Start")
             self.video_mode_field.proxy.widget.set_button_sensitivity(gtk.SENSITIVITY_AUTO)

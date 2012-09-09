@@ -15,37 +15,18 @@ gobject.threads_init()
 gtk.gdk.threads_init()
 
 
-class GStreamerVideoView(SlaveView):
+class GStreamerVideoPipelineManager(gobject.GObject):
     """
     SlaveView for displaying GStreamer video sink
     """
     gsignal('video-started', object)
 
-    def __init__(self, pipeline, force_aspect_ratio=True):
-        super(GStreamerVideoView, self).__init__()
-        self.widget = gtk.DrawingArea()
-        self.widget.connect('realize', self.on_realize)
+    def __init__(self):
+        super(GStreamerVideoPipelineManager, self).__init__()
         self.window_xid = None
-        self.pipeline = pipeline
-        self.force_aspect_ratio = force_aspect_ratio
+        self.pipeline = None
         self.start_time = None
         self.sink = None
-
-    def on_realize(self, widget):
-        if not self.widget.window.has_native():
-            # Note that this is required (at least for Windows) to ensure that
-            # the DrawingArea has a native window assigned.  In Windows, if this
-            # is not done, the video is written to the parent OS window (not a
-            # "window" in the traditional sense of an app, but rather in the
-            # window manager clipped rectangle sense).  The symptom is that the
-            # video will be drawn over top of any widgets, etc. in the parent
-            # window.
-            if not self.widget.window.ensure_native():
-                raise RuntimeError, 'Failed to get native window handle'
-        if os.name == 'nt':
-            self.window_xid = self.widget.window.handle
-        else:
-            self.window_xid = self.widget.window.xid
 
     @property
     def pipeline(self):
@@ -85,19 +66,48 @@ class GStreamerVideoView(SlaveView):
             self.pipeline.set_state(gst.STATE_NULL)
     
     def on_sync_message(self, bus, message):
+        print '[on_sync_message]'
         if message.structure is None:
             return
         message_name = message.structure.get_name()
         if message_name == "prepare-xwindow-id":
             imagesink = message.src
-            if self.force_aspect_ratio:
-                imagesink.set_property("force-aspect-ratio", True)
-            gtk.gdk.threads_enter()
+            #if self.force_aspect_ratio:
+            #imagesink.set_property("force-aspect-ratio", True)
+            print '  window XID: %s' % self.window_xid
             if self.window_xid is None:
                 raise ValueError, 'Invalid window_xid.  Ensure the '\
                     'DrawingArea has been realized.'
-            
             imagesink.set_xwindow_id(self.window_xid)
             imagesink.expose()
-            gtk.gdk.threads_leave()
             self.sink = imagesink
+
+
+class GStreamerVideoView(SlaveView):
+    """
+    SlaveView for displaying GStreamer video sink
+    """
+
+    def __init__(self, force_aspect_ratio=True):
+        super(GStreamerVideoView, self).__init__()
+        self.widget = gtk.DrawingArea()
+        self.widget.connect('realize', self.on_realize)
+        self.window_xid = None
+        self.force_aspect_ratio = force_aspect_ratio
+
+    def on_realize(self, widget):
+        if not self.widget.window.has_native():
+            # Note that this is required (at least for Windows) to ensure that
+            # the DrawingArea has a native window assigned.  In Windows, if this
+            # is not done, the video is written to the parent OS window (not a
+            # "window" in the traditional sense of an app, but rather in the
+            # window manager clipped rectangle sense).  The symptom is that the
+            # video will be drawn over top of any widgets, etc. in the parent
+            # window.
+            if not self.widget.window.ensure_native():
+                raise RuntimeError, 'Failed to get native window handle'
+        if os.name == 'nt':
+            self.window_xid = self.widget.window.handle
+        else:
+            self.window_xid = self.widget.window.xid
+        print '[GStreamerVideoView] on_realize: WINDOW_XID=%s' % self.window_xid
