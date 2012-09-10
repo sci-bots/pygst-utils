@@ -81,8 +81,12 @@ class GTK_Main:
                 obey_child=False)
         
         self.pipeline = None
+        self._server = None
 
         vbox.pack_start(self.aframe, expand=True)
+        self.movie_view = GStreamerVideoView() 
+        self.movie_window = self.movie_view.widget
+        self.aframe.add(self.movie_window)
         window.show_all()
         self.window = window
 
@@ -115,46 +119,49 @@ class GTK_Main:
 
     def start_stop(self, w):
         if self.button.get_label() == "Start":
-            if not self.output_path:
-                error('Please select a valid output filepath.')               
-                return
-            self.movie_view = GStreamerVideoView() 
-            self.movie_window = self.movie_view.widget
-            self.movie_window.set_size_request(640, 480)
-            self.aframe.add(self.movie_window)
-            self.aframe.show_all()
-
-            # Start JSON-RPC server to control GStreamer video pipeline.
-            # There are issues with the GTK gui freezing when the
-            # GStreamer pipeline is started here directly.
-            self._server = Popen([sys.executable, 'server.py'], stdout=PIPE, stderr=PIPE)
-            time.sleep(0.5)
-            # Connect to JSON-RPC server and request to run the pipeline
-            s = Server('http://localhost:8080')
-            s.run_pipeline(self.movie_view.window_xid)
-
-            self.video_mode_field.proxy.widget.set_button_sensitivity(gtk.SENSITIVITY_OFF)
-            self.output_path_field.widget.set_sensitive(False)
-            self.bitrate_field.widget.set_sensitive(False)
-
-            self.button.set_label("Stop")
+            self.start()
         else:
-            s = Server('http://localhost:8080')
-            s.stop_pipeline(self.movie_view.window_xid)
-            s.terminate_pipeline(self.movie_view.window_xid)
-            self._server.kill()
-            del self._server
-            self.aframe.remove(self.movie_window)
-            del self.movie_view
-            self.movie_view = None
-            self.button.set_label("Start")
-            self.video_mode_field.proxy.widget.set_button_sensitivity(gtk.SENSITIVITY_AUTO)
-            self.output_path_field.widget.set_sensitive(True)
-            self.bitrate_field.widget.set_sensitive(True)
+            self.stop()
+
+    def start(self):
+        if not self.output_path:
+            error('Please select a valid output filepath.')               
+            return
+        self.movie_window.set_size_request(640, 480)
+        self.aframe.show_all()
+
+        # Start JSON-RPC server to control GStreamer video pipeline.
+        # There are issues with the GTK gui freezing when the
+        # GStreamer pipeline is started here directly.
+        self._server = Popen([sys.executable, 'server.py'], stdout=PIPE, stderr=PIPE)
+        timesleep(0.5)
+        # Connect to JSON-RPC server and request to run the pipeline
+        s = Server('http://localhost:8080')
+        s.run_pipeline(self.movie_view.window_xid)
+
+        self.video_mode_field.proxy.widget.set_button_sensitivity(gtk.SENSITIVITY_OFF)
+        self.output_path_field.widget.set_sensitive(False)
+        self.bitrate_field.widget.set_sensitive(False)
+
+        self.button.set_label("Stop")
+
+    def stop(self):
+        s = Server('http://localhost:8080')
+        s.stop_pipeline(self.movie_view.window_xid)
+        s.terminate_pipeline(self.movie_view.window_xid)
+        self._server.kill()
+        self._server = None
+        #self.aframe.remove(self.movie_window)
+        #del self.movie_view
+        #self.movie_view = None
+        self.button.set_label("Start")
+        self.video_mode_field.proxy.widget.set_button_sensitivity(gtk.SENSITIVITY_AUTO)
+        self.output_path_field.widget.set_sensitive(True)
+        self.bitrate_field.widget.set_sensitive(True)
 
     def on_destroy(self, *args):
-        if self.pipeline:
-            self.pipeline.set_state(gst.STATE_NULL)
+        if self._server:
+            self.stop()
         gtk.main_quit()
 
 
