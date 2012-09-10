@@ -1,13 +1,14 @@
 #!/usr/bin/env python
 
-import win32com
-import pythoncom
 import cgi
 import logging
 import sys, os
 import pygtk, gtk, gobject
 from subprocess import Popen, PIPE
 import time
+if os.name == 'nt':
+    import win32com
+    import pythoncom
 
 try:
     import pygst
