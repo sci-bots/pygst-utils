@@ -31,17 +31,22 @@ def stop_pipeline(window_xid):
     print processes.keys()
     
 
-def run_pipeline(window_xid):
+def run_pipeline(window_xid, video_settings, output_path, bitrate):
     print 'run_pipeline: %s' % window_xid
     master_pipe, worker_pipe = pipes[window_xid] = Pipe()
-    process = PipelineWindowProcess(window_xid, worker_pipe)
+    process = PipelineWindowProcess(window_xid, video_settings, output_path, bitrate, worker_pipe)
     process.start()
     processes[window_xid] = process
     print processes.keys()
 
 
 if __name__ == '__main__':
+    import logging
+    logging.basicConfig(format='[%(levelname)s] %(message)s', loglevel=logging.DEBUG)
+    logging.info('Starting server')
+
     server = SimpleJSONRPCServer(('localhost', 8080))
+    server.register_function(pow)
     server.register_function(run_pipeline)
     server.register_function(terminate_pipeline)
     server.register_function(stop_pipeline)

@@ -131,12 +131,10 @@ class GTK_Main:
     def video_settings(self, value):
         self._video_settings = value
 
-    def get_video_source(self):
+    def get_video_device_and_caps_str(self):
         selected_mode = self.video_mode_map[self.video_settings]
         caps_str = GstVideoSourceManager.get_caps_string(selected_mode)
-        video_source = create_video_source(
-                selected_mode['device'], caps_str)
-        return video_source
+        return (str(selected_mode['device']), caps_str)
 
     def start_stop(self, w):
         if self.button.get_label() == "Start":
@@ -158,10 +156,13 @@ class GTK_Main:
             self._server = Popen([base_path().joinpath('server', 'server.exe')], stdout=PIPE, stderr=PIPE)
         else:
             self._server = Popen([sys.executable, base_path().joinpath('server.py')], stdout=PIPE, stderr=PIPE)
-        time.sleep(0.5)
+        time.sleep(1)
         # Connect to JSON-RPC server and request to run the pipeline
         s = Server('http://localhost:8080')
-        s.run_pipeline(self.movie_view.window_xid)
+
+        s.run_pipeline(self.movie_view.window_xid,
+                self.get_video_device_and_caps_str(), self.output_path,
+                        self.bitrate)
 
         self.video_mode_field.proxy.widget.set_button_sensitivity(gtk.SENSITIVITY_OFF)
         self.output_path_field.widget.set_sensitive(False)
