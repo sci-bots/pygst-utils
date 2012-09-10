@@ -1,6 +1,8 @@
 import sys
 import logging
 from multiprocessing import Process, Pipe
+import multiprocessing
+multiprocessing.freeze_support()
 
 from gst_video_source_caps_query.video_mode_dialog import get_pipeline
 from gstreamer_view import GStreamerVideoPipelineManager

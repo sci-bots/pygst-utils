@@ -167,7 +167,7 @@ def generate_wxs(root_path, version):
     dw = DirectoryWalker()
     root = dw.xml_tree(root_path)
 
-    extra_dirs = ['opencv', ]
+    extra_dirs = ['opencv', 'flatland', 'server', 'pygtkhelpers', 'etc', 'support', 'share']
     children = dict([(name, dw.xml_tree(root_path.joinpath(name),
             recursive=True)) for name in extra_dirs])
 
@@ -176,6 +176,7 @@ def generate_wxs(root_path, version):
 
     all_components = list(itertools.chain(*[c[1] for c in children.itervalues()]))
     all_components += root[1]
+    #print all_components
 
     t = jinja2.Template(WXS_TEMPLATE)
 

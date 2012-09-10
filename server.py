@@ -1,5 +1,10 @@
+import cgi
 from multiprocessing import Pipe
+import multiprocessing
+multiprocessing.freeze_support()
 
+import blinker
+import decimal
 from jsonrpclib.SimpleJSONRPCServer import SimpleJSONRPCServer
 
 from test_pipeline_process import PipelineWindowProcess

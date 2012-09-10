@@ -1,10 +1,14 @@
 #!/usr/bin/env python
 
+import win32com
+import pythoncom
+import cgi
 import logging
 import sys, os
 import pygtk, gtk, gobject
 from subprocess import Popen, PIPE
 import time
+
 try:
     import pygst
     pygst.require("0.10")
@@ -14,6 +18,9 @@ finally:
     import gst
 import gobject
 from jsonrpclib import Server
+import blinker
+import decimal
+from path import path
 
 from warp_perspective import warp_perspective, WarpBin
 from gstreamer_view import GStreamerVideoView
@@ -34,6 +41,19 @@ from flatland.validation import ValueAtLeast, ValueAtMost
 
 #gst.debug_set_active(True)
 #gst.debug_set_default_threshold(3)
+
+
+def base_path():
+    # When executing from a frozen (pyinstaller) executable...
+    if hasattr(sys, 'frozen'):
+        return path(sys.executable).parent
+
+    # Otherwise...
+    try:
+        script = path(__file__)
+    except NameError:
+        script = path(sys.argv[0])
+    return script.parent.parent
 
 
 class GTK_Main:
@@ -133,8 +153,11 @@ class GTK_Main:
         # Start JSON-RPC server to control GStreamer video pipeline.
         # There are issues with the GTK gui freezing when the
         # GStreamer pipeline is started here directly.
-        self._server = Popen([sys.executable, 'server.py'], stdout=PIPE, stderr=PIPE)
-        timesleep(0.5)
+        if hasattr(sys, 'frozen'):
+            self._server = Popen([base_path().joinpath('server', 'server.exe')], stdout=PIPE, stderr=PIPE)
+        else:
+            self._server = Popen([sys.executable, base_path().joinpath('server.py')], stdout=PIPE, stderr=PIPE)
+        time.sleep(0.5)
         # Connect to JSON-RPC server and request to run the pipeline
         s = Server('http://localhost:8080')
         s.run_pipeline(self.movie_view.window_xid)
