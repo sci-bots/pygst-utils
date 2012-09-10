@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import logging
 import sys, os
 import pygtk, gtk, gobject
 try:
@@ -10,6 +11,7 @@ except ImportError:
 finally:
     import gst
 import gobject
+from jsonrpclib import Server
 
 from warp_perspective import warp_perspective, WarpBin
 from gstreamer_view import GStreamerVideoView
@@ -118,14 +120,19 @@ class GTK_Main:
                     #self.bitrate, self.output_path)
 
             #self.movie_view = GStreamerVideoView(self.pipeline)
-            self.movie_view = GStreamerVideoView()
+            self.movie_view = GStreamerVideoView() 
             self.movie_window = self.movie_view.widget
             self.movie_window.set_size_request(640, 480)
             self.aframe.add(self.movie_window)
             self.aframe.show_all()
+            from subprocess import Popen, PIPE
 
-            self.p = PipelineWindowProcess(self.movie_view.window_xid)
-            self.p.start()
+            self._server = Popen(['/usr/bin/python', 'server.py'], stdout=PIPE, stderr=PIPE)
+            import time
+            time.sleep(0.5)
+            s = Server('http://localhost:8080')
+            s.run_pipeline(self.movie_view.window_xid)
+            del s
 
             self.video_mode_field.proxy.widget.set_button_sensitivity(gtk.SENSITIVITY_OFF)
             self.output_path_field.widget.set_sensitive(False)
@@ -133,7 +140,11 @@ class GTK_Main:
 
             self.button.set_label("Stop")
         else:
-            self.p.terminate()
+            s = Server('http://localhost:8080')
+            s.stop_pipeline(self.movie_view.window_xid)
+            s.terminate_pipeline(self.movie_view.window_xid)
+            self._server.kill()
+            del self._server
             self.aframe.remove(self.movie_window)
             del self.movie_view
             self.movie_view = None
@@ -149,5 +160,6 @@ class GTK_Main:
 
 
 if __name__ == '__main__':        
+    logging.basicConfig(format='[%(levelname)s] %(message)s', loglevel=logging.DEBUG)
     GTK_Main()
     gtk.main()
