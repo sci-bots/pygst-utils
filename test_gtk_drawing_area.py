@@ -3,6 +3,8 @@
 import logging
 import sys, os
 import pygtk, gtk, gobject
+from subprocess import Popen, PIPE
+import time
 try:
     import pygst
     pygst.require("0.10")
@@ -116,23 +118,20 @@ class GTK_Main:
             if not self.output_path:
                 error('Please select a valid output filepath.')               
                 return
-            #self.pipeline = get_pipeline(self.get_video_source(),
-                    #self.bitrate, self.output_path)
-
-            #self.movie_view = GStreamerVideoView(self.pipeline)
             self.movie_view = GStreamerVideoView() 
             self.movie_window = self.movie_view.widget
             self.movie_window.set_size_request(640, 480)
             self.aframe.add(self.movie_window)
             self.aframe.show_all()
-            from subprocess import Popen, PIPE
 
-            self._server = Popen(['/usr/bin/python', 'server.py'], stdout=PIPE, stderr=PIPE)
-            import time
+            # Start JSON-RPC server to control GStreamer video pipeline.
+            # There are issues with the GTK gui freezing when the
+            # GStreamer pipeline is started here directly.
+            self._server = Popen([sys.executable, 'server.py'], stdout=PIPE, stderr=PIPE)
             time.sleep(0.5)
+            # Connect to JSON-RPC server and request to run the pipeline
             s = Server('http://localhost:8080')
             s.run_pipeline(self.movie_view.window_xid)
-            del s
 
             self.video_mode_field.proxy.widget.set_button_sensitivity(gtk.SENSITIVITY_OFF)
             self.output_path_field.widget.set_sensitive(False)
