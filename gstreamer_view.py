@@ -94,6 +94,11 @@ class GStreamerVideoView(SlaveView):
         self.widget.connect('realize', self.on_realize)
         self.window_xid = None
         self.force_aspect_ratio = force_aspect_ratio
+        self._set_window_title = False
+
+    def show_and_run(self):
+        self._set_window_title = True
+        super(GStreamerVideoView, self).show_and_run()
 
     def on_realize(self, widget):
         if not self.widget.window.has_native():
@@ -110,3 +115,9 @@ class GStreamerVideoView(SlaveView):
             self.window_xid = self.widget.window.handle
         else:
             self.window_xid = self.widget.window.xid
+        # Copy window xid to clipboard
+        clipboard = gtk.Clipboard()
+        clipboard.set_text(str(self.window_xid))
+        if self._set_window_title:
+            self.widget.parent.set_title('[window_xid] %s' % self.window_xid)
+        print '[window_xid] %s' % self.window_xid
