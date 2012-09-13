@@ -37,23 +37,25 @@ if __name__ == '__main__':
     try:
         p.start()
 
-        master_pipe.send({'command': 'create',
-                'device': None,
-                'caps_str': 'video/x-raw-yuv,width=640,height=480,fourcc=YUY2,framerate=30/1',
-                'bitrate': 150000, 'output_path': 'test_output.avi'})
+        for i in range(2):
+            master_pipe.send({'command': 'create',
+                    'device': None,
+                    'caps_str': 'video/x-raw-yuv,width=640,height=480,fourcc=YUY2,framerate=30/1'})
 
-        time.sleep(1)
-        master_pipe.send({'command': 'start'})
+            time.sleep(1)
+            master_pipe.send({'command': 'start'})
 
-        time.sleep(3)
-        master_pipe.send({'command': 'stop'})
-        time.sleep(1)
-        master_pipe.send({'command': 'create',
-                'device': device, 'caps_str': caps_str,
-                'bitrate': 150000, 'output_path': 'test_output.avi'})
-        master_pipe.send({'command': 'start'})
-        time.sleep(3)
-        master_pipe.send({'command': 'stop'})
+            time.sleep(3)
+            master_pipe.send({'command': 'stop'})
+
+            time.sleep(1)
+            master_pipe.send({'command': 'create', 'device': device,
+                    'caps_str': caps_str,
+                    'bitrate': 150000, 'output_path': 'test_output.avi'})
+            master_pipe.send({'command': 'start'})
+
+            time.sleep(3)
+            master_pipe.send({'command': 'stop'})
         master_pipe.send({'command': 'join'})
     except:
         p.terminate()
