@@ -1,8 +1,10 @@
 import logging
 import time
 from multiprocessing import Pipe
+import gtk
+import traceback
 
-from gst_video_source_caps_query.video_mode_dialog import select_video_caps
+import gst
 
 from test_pipeline_process import PipelineWindowProcess
 
@@ -25,39 +27,51 @@ Start a pipeline window process.""",
     return args
 
 
+def run_command(pipeline_window_process, **kwargs):
+    logging.debug('{}'.format(kwargs.get('command', None)))
+    request = kwargs
+    pipeline_window_process.parent_pipe.send(request)
+    if request.get('ack', False):
+        return pipeline_window_process.parent_pipe.recv()
+    return None
+
+
 if __name__ == '__main__':
-    logging.basicConfig(format='[%(levelname)s] %(message)s', level=logging.INFO)
+    logging.basicConfig(format='[%(levelname)s] %(message)s', level=logging.DEBUG)
 
     args = parse_args()
 
-    device, caps_str = select_video_caps()
-
-    master_pipe, worker_pipe = Pipe()
-    p = PipelineWindowProcess(args.window_xid, worker_pipe)
+    p = PipelineWindowProcess(args.window_xid)
     try:
         p.start()
+        response = run_command(p, command='select_video_caps', ack=True)['response']
+        logging.info('[response] %s' % response)
+        device, caps_str = response['device'], response['caps_str']
 
         for i in range(2):
-            master_pipe.send({'command': 'create',
-                    'device': None,
-                    'caps_str': 'video/x-raw-yuv,width=640,height=480,fourcc=YUY2,framerate=30/1'})
+            response = run_command(p, command='create', device=device,
+                    caps_str=caps_str, bitrate=150000,
+                            output_path='test_output.avi', ack=True)
+            logging.info('[response] %s' % response)
 
-            time.sleep(1)
-            master_pipe.send({'command': 'start'})
+            response = run_command(p, command='start', ack=True)
+            logging.info('[response] %s' % response)
+            time.sleep(5)
+
+            run_command(p, command='stop')
+            response = run_command(p, command='create', device=None, ack=True,
+                    caps_str='video/x-raw-yuv,width=640,height=480,fourcc=YUY2'\
+                            ',framerate=30/1')
+            logging.info('[response] %s' % response)
+            run_command(p, command='start')
+            logging.info('[response] %s' % response)
 
             time.sleep(3)
-            master_pipe.send({'command': 'stop'})
-
-            time.sleep(1)
-            master_pipe.send({'command': 'create', 'device': device,
-                    'caps_str': caps_str,
-                    'bitrate': 150000, 'output_path': 'test_output.avi'})
-            master_pipe.send({'command': 'start'})
-
-            time.sleep(3)
-            master_pipe.send({'command': 'stop'})
-        master_pipe.send({'command': 'join'})
-    except:
+            run_command(p, command='stop')
+        run_command(p, command='join')
+    except (Exception, ), why:
+        traceback.print_stack()
+        traceback.print_exc()
         p.terminate()
     else:
         p.join()
