@@ -20,6 +20,14 @@ class PipelineWindowProcess(Process):
         self.window_xid = window_xid
         self.pm = None
 
+    def __call__(self, **kwargs):
+        logging.debug('{}'.format(kwargs.get('command', None)))
+        request = kwargs
+        self.parent_pipe.send(request)
+        if request.get('ack', False):
+            return self.parent_pipe.recv()
+        return None
+
     def run(self):
         '''
         Method to be run in the child process.
@@ -27,7 +35,7 @@ class PipelineWindowProcess(Process):
         self.pm = GStreamerVideoPipelineManager()
         self.pm.window_xid = self.window_xid
 
-        gtk.timeout_add(100, self._update_state)
+        gtk.timeout_add(500, self._update_state)
         gtk.main()
 
     def _update_state(self):
@@ -77,13 +85,14 @@ class PipelineWindowProcess(Process):
         from gst_video_source_caps_query.video_mode_dialog import select_video_caps
 
         device, caps_str = select_video_caps()
-        return {'device': device, 'caps_str': caps_str}
+        return {'device': str(device), 'caps_str': caps_str}
 
     def _stop(self, **kwargs):
         response = self.pm.pipeline.set_state(gst.STATE_NULL)
         return response
 
     def _create(self, **kwargs):
+        print '[_create] kwargs={}'.format(kwargs)
         response = self.create(kwargs['device'], kwargs['caps_str'],
                 kwargs.get('bitrate', None),
                         kwargs.get('output_path', None))

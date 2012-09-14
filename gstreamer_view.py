@@ -39,7 +39,6 @@ class GStreamerVideoPipelineManager(gobject.GObject):
     def pipeline(self, pipeline):
         if hasattr(self, '_pipeline') and self._pipeline:
             result = self._pipeline.set_state(gst.STATE_NULL)
-            print result
             if hasattr(self, 'sink') and self.sink:
                 self.sink.set_xwindow_id(0)
                 del self.sink

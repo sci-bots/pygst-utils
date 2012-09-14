@@ -153,9 +153,11 @@ class GTKGStreamerWindow:
         # Connect to JSON-RPC server and request to run the pipeline
         s = Server('http://localhost:8080')
 
-        s.run_pipeline(self.movie_view.window_xid,
+        s.create_process(self.movie_view.window_xid)
+        s.create_pipeline(self.movie_view.window_xid,
                 self.get_video_device_and_caps_str(), self.output_path,
                         self.bitrate)
+        s.start_pipeline(self.movie_view.window_xid)
 
         self.video_mode_field.proxy.widget.set_button_sensitivity(gtk.SENSITIVITY_OFF)
         self.output_path_field.widget.set_sensitive(False)
@@ -166,7 +168,7 @@ class GTKGStreamerWindow:
     def stop(self):
         s = Server('http://localhost:8080')
         s.stop_pipeline(self.movie_view.window_xid)
-        s.terminate_pipeline(self.movie_view.window_xid)
+        s.terminate_process(self.movie_view.window_xid)
         self._server.kill()
         self._server = None
         #self.aframe.remove(self.movie_window)

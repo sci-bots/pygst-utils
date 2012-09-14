@@ -1,12 +1,15 @@
 import cgi
 from multiprocessing import Pipe
 import logging
+import traceback
 import multiprocessing
 multiprocessing.freeze_support()
 
 import blinker
 import decimal
 from jsonrpclib.SimpleJSONRPCServer import SimpleJSONRPCServer
+import gobject
+gobject.threads_init()
 
 from test_pipeline_process import PipelineWindowProcess
 
@@ -15,11 +18,14 @@ class GStreamerService(object):
     def __init__(self, hostname='localhost', port=8080):
         self.server = SimpleJSONRPCServer(('localhost', 8080))
         self.server.register_function(pow)
-        self.server.register_function(self.run_pipeline)
-        self.server.register_function(self.terminate_pipeline)
+        self.server.register_function(self.dump_args)
+        self.server.register_function(self.create_process)
+        self.server.register_function(self.create_pipeline)
+        self.server.register_function(self.select_video_caps)
+        self.server.register_function(self.terminate_process)
         self.server.register_function(self.stop_pipeline)
+        self.server.register_function(self.start_pipeline)
         self.processes = {}
-        self.pipes = {}
 
     def run(self):
         try:
@@ -30,36 +36,38 @@ class GStreamerService(object):
             for process in self.processes.values():
                 process.join()
 
-    def terminate_pipeline(self, window_xid):
-        print 'terminate_pipeline: %s' % window_xid
+    def dump_args(self, args):
+        print 'args={}'.format(args)
+
+    def select_video_caps(self, window_xid):
         process = self.processes[window_xid]
+        return process(command='select_video_caps', ack=True)['response']
+
+    def terminate_process(self, window_xid):
+        process = self.processes[window_xid]
+        result = process(command='join', ack=True)
         process.terminate()
-        del self.pipes[window_xid]
         del self.processes[window_xid]
-        print '  (terminated)'
 
     def stop_pipeline(self, window_xid):
-        print 'stop_pipeline: %s' % window_xid
-        master_pipe, worker_pipe = self.pipes[window_xid]
-        master_pipe.send({'command': 'stop'})
-        master_pipe.send({'command': 'join'})
-        print self.processes.keys()
+        process = self.processes[window_xid]
+        process(command='stop')
         
     def start_pipeline(self, window_xid):
-        print 'start_pipeline: %s' % window_xid
-        master_pipe, worker_pipe = self.pipes[window_xid]
-        master_pipe.send({'command': 'start'})
+        process = self.processes[window_xid]
+        process(command='start')
 
-    def create_pipeline(self, window_xid, video_settings, output_path=None,
-            bitrate=None):
-        print 'create_pipeline: %s' % window_xid
-        master_pipe, worker_pipe = self.pipes[window_xid] = Pipe()
-        process = PipelineWindowProcess(window_xid, worker_pipe)
-        device, caps_str = video_settings
-        worker_pipe.send({'command': 'create', 'device': device, 'caps_str': caps_str,
-                'output_path': output_path, 'bitrate': bitrate})
+    def create_process(self, window_xid):
+        process = PipelineWindowProcess(window_xid)
+        process.start()
         self.processes[window_xid] = process
-        print self.processes.keys()
+        return None
+
+    def create_pipeline(self, window_xid, video_settings, output_path=None, bitrate=None):
+        process = self.processes[window_xid]
+        device, caps_str = video_settings
+        process(command='create', device=str(device), caps_str=str(caps_str),
+                    output_path=output_path, bitrate=bitrate, ack=True)
 
 
 if __name__ == '__main__':
