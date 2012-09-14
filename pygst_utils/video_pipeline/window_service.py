@@ -11,10 +11,10 @@ from jsonrpclib.SimpleJSONRPCServer import SimpleJSONRPCServer
 import gobject
 gobject.threads_init()
 
-from test_pipeline_process import PipelineWindowProcess
+from window_process import WindowProcess
 
 
-class GStreamerService(object):
+class WindowService(object):
     def __init__(self, hostname='localhost', port=8080):
         self.server = SimpleJSONRPCServer(('localhost', 8080))
         self.server.register_function(pow)
@@ -52,13 +52,13 @@ class GStreamerService(object):
     def stop_pipeline(self, window_xid):
         process = self.processes[window_xid]
         process(command='stop')
-        
+
     def start_pipeline(self, window_xid):
         process = self.processes[window_xid]
         process(command='start')
 
     def create_process(self, window_xid):
-        process = PipelineWindowProcess(window_xid)
+        process = WindowProcess(window_xid)
         process.start()
         self.processes[window_xid] = process
         return None
@@ -68,12 +68,3 @@ class GStreamerService(object):
         device, caps_str = video_settings
         process(command='create', device=str(device), caps_str=str(caps_str),
                     output_path=output_path, bitrate=bitrate, ack=True)
-
-
-if __name__ == '__main__':
-    logging.basicConfig(format='[%(levelname)s] %(message)s', loglevel=logging.DEBUG)
-
-    service = GStreamerService()
-    logging.info('Starting server')
-
-    service.run()

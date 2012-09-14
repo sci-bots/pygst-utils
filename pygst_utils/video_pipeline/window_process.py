@@ -1,21 +1,18 @@
-from pprint import pformat
-import sys
 import logging
 from multiprocessing import Process, Pipe
 import multiprocessing
 multiprocessing.freeze_support()
 
-from test_video import get_pipeline
-from gstreamer_view import GStreamerVideoPipelineManager
+from __init__ import get_pipeline
+from pipeline_manager import PipelineManager
 import gst
-import glib
 import gtk
 gtk.threads_init()
 
 
-class PipelineWindowProcess(Process):
+class WindowProcess(Process):
     def __init__(self, window_xid):
-        super(PipelineWindowProcess, self).__init__()
+        super(WindowProcess, self).__init__()
         self.parent_pipe, self.child_pipe = Pipe()
         self.window_xid = window_xid
         self.pm = None
@@ -32,7 +29,7 @@ class PipelineWindowProcess(Process):
         '''
         Method to be run in the child process.
         '''
-        self.pm = GStreamerVideoPipelineManager()
+        self.pm = PipelineManager()
         self.pm.window_xid = self.window_xid
 
         gtk.timeout_add(500, self._update_state)
@@ -62,7 +59,6 @@ class PipelineWindowProcess(Process):
         Execute the specified command by looking up the corresponding
         member function.
         '''
-        response = None
         command_attr = '_%s' % request.get('command', None)
         if hasattr(self, command_attr):
             return getattr(self, command_attr)(**request)
@@ -82,7 +78,7 @@ class PipelineWindowProcess(Process):
         return response
 
     def _select_video_caps(self, **kwargs):
-        from gst_video_source_caps_query.video_mode_dialog import select_video_caps
+        from ..video_mode import select_video_caps
 
         device, caps_str = select_video_caps()
         return {'device': str(device), 'caps_str': caps_str}
@@ -105,7 +101,7 @@ class PipelineWindowProcess(Process):
     ### utility methods ####################################################
 
     def create(self, device, caps_str, bitrate=None, record_path=None):
-        from gst_video_source_caps_query.video_mode_dialog import create_video_source
+        from ..video_mode import create_video_source
 
         def init_pipeline(pm, device, caps_str, bitrate, record_path):
             video_source = create_video_source(device, caps_str)
@@ -113,12 +109,3 @@ class PipelineWindowProcess(Process):
             pm.pipeline = pipeline
             return pm.pipeline.set_state(gst.STATE_READY)
         return init_pipeline(self.pm, device, caps_str, bitrate, record_path)
-
-
-if __name__ == '__main__':
-    if len(sys.argv) != 2:
-        print >> sys.stderr, 'usage: %s <window_xid>' % sys.argv[0]
-    window_xid = int(sys.argv[1])
-    p = PipelineWindowProcess(window_xid)
-    p.start()
-    p.join()
