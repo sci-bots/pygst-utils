@@ -1,8 +1,6 @@
-import logging
 import platform
 
 import gst
-from path import path
 import gtk
 gtk.gdk.threads_init()
 
@@ -10,7 +8,6 @@ gtk.gdk.threads_init()
 # will messed our program up
 import gobject
 gobject.threads_init()
-from ..elements.cairo_draw import CairoDrawBase
 
 
 def get_pipeline(video_source, bitrate=None, output_path=None):
@@ -32,6 +29,7 @@ def _get_pipeline(video_source):
     rate_caps_filter = gst.element_factory_make('capsfilter',
             'rate_caps_filter')
     rate_caps_filter.set_property('caps', rate_caps)
+    '''
     cairo_color_in = gst.element_factory_make('ffmpegcolorspace', 'cairo_color_in')
     cairo_draw = CairoDrawBase('cairo_draw')
     cairo_color_out = gst.element_factory_make('ffmpegcolorspace', 'cairo_color_out')
@@ -40,6 +38,11 @@ def _get_pipeline(video_source):
             cairo_color_in, cairo_draw, cairo_color_out, video_sink)
     gst.element_link_many(video_source, video_rate, rate_caps_filter,
             feed_queue, cairo_color_in, cairo_draw, cairo_color_out, video_sink)
+    '''
+    pipeline.add(video_source, video_rate, rate_caps_filter, feed_queue,
+            video_sink)
+    gst.element_link_many(video_source, video_rate, rate_caps_filter,
+            feed_queue, video_sink)
 
     return pipeline
 
@@ -59,9 +62,6 @@ def _get_recording_pipeline(video_source, bitrate, output_path):
     rate_caps_filter = gst.element_factory_make('capsfilter',
             'rate_caps_filter')
     rate_caps_filter.set_property('caps', rate_caps)
-    cairo_color_in = gst.element_factory_make('ffmpegcolorspace', 'cairo_color_in')
-    cairo_draw = CairoDrawBase('cairo_draw')
-    cairo_color_out = gst.element_factory_make('ffmpegcolorspace', 'cairo_color_out')
 
     capture_queue = gst.element_factory_make('queue', 'capture_queue')
     ffmpeg_color_space = gst.element_factory_make('ffmpegcolorspace', 'ffmpeg_color_space')
@@ -76,12 +76,11 @@ def _get_recording_pipeline(video_source, bitrate, output_path):
     file_sink.set_property('location', output_path)
 
     pipeline.add(video_source, video_rate, rate_caps_filter,
-            cairo_color_in, cairo_draw, cairo_color_out,
             webcam_tee, feed_queue, video_sink, capture_queue,
             ffmpeg_color_space, ffenc_mpeg4, avi_mux, file_sink)
     gst.element_link_many(video_source, video_rate, rate_caps_filter,
             webcam_tee)
-    gst.element_link_many(webcam_tee, cairo_color_in, cairo_draw, cairo_color_out, feed_queue, video_sink)
+    gst.element_link_many(webcam_tee, feed_queue, video_sink)
     gst.element_link_many(webcam_tee, capture_queue, ffmpeg_color_space, ffenc_mpeg4, avi_mux, file_sink)
 
     return pipeline
