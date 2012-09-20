@@ -1,3 +1,4 @@
+import os
 import logging
 from multiprocessing import Process, Pipe
 import multiprocessing
@@ -11,8 +12,9 @@ gtk.threads_init()
 
 
 class WindowProcess(Process):
-    def __init__(self, window_xid):
+    def __init__(self, window_xid, force_aspect_ratio=True):
         super(WindowProcess, self).__init__()
+        self.force_aspect_ratio = force_aspect_ratio
         self.parent_pipe, self.child_pipe = Pipe()
         self.window_xid = window_xid
         self.pm = None
@@ -29,7 +31,7 @@ class WindowProcess(Process):
         '''
         Method to be run in the child process.
         '''
-        self.pm = PipelineManager()
+        self.pm = PipelineManager(force_aspect_ratio=self.force_aspect_ratio)
         self.pm.window_xid = self.window_xid
 
         gtk.timeout_add(500, self._update_state)
@@ -73,9 +75,27 @@ class WindowProcess(Process):
         response = self.pm.pipeline.set_state(gst.STATE_PLAYING)
         return response
 
+    def _get_pid(self, **kwargs):
+        return os.getpid()
+
     def _get_state(self, **kwargs):
         response = self.pm.pipeline.get_state(gst.STATE_NULL)
         return response
+
+    def _get_video_mode_enum(self, **kwargs):
+        from ..video_mode import get_video_mode_enum
+
+        return get_video_mode_enum()
+
+    def _get_video_mode_map(self, **kwargs):
+        from ..video_mode import get_video_mode_map
+
+        return get_video_mode_map()
+
+    def _select_video_mode(self, **kwargs):
+        from ..video_mode import select_video_mode
+
+        return select_video_mode()
 
     def _select_video_caps(self, **kwargs):
         from ..video_mode import select_video_caps

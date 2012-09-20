@@ -28,7 +28,10 @@ def get_video_mode_enum(video_modes=None):
     return Enum.named('video_mode').valued(*video_keys)
 
 
-def get_video_mode_map(video_modes):
+def get_video_mode_map(video_modes=None):
+    if video_modes is None:
+        video_modes = get_available_video_modes(
+                format_='YUY2')
     format_cap = lambda c: '[%s] ' % getattr(c['device'], 'name',
             c['device'])[:20] + '{width:4d}x{height:d} {fps:2.0f}fps '\
                     '({fourcc:s})'.format(
@@ -37,7 +40,7 @@ def get_video_mode_map(video_modes):
     return video_mode_map
 
 
-def select_video_mode(video_modes):
+def select_video_mode(video_modes=None):
     video_mode_map = get_video_mode_map(video_modes)
     video_keys = sorted(video_mode_map.keys())
     enum = get_video_mode_enum(video_modes)

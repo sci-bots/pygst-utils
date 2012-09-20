@@ -16,7 +16,7 @@ class GtkVideoView(SlaveView):
     SlaveView for displaying GStreamer video sink
     """
 
-    def __init__(self, width=None, height=None, force_aspect_ratio=True):
+    def __init__(self, width=None, height=None):
         if width is None:
             self.width = 640
         else:
@@ -30,7 +30,6 @@ class GtkVideoView(SlaveView):
         self.widget.set_size_request(self.width, self.height)
         self.widget.connect('realize', self.on_realize)
         self.window_xid = None
-        self.force_aspect_ratio = force_aspect_ratio
         self._set_window_title = False
 
     def show_and_run(self):
