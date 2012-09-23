@@ -103,6 +103,16 @@ class WindowProcess(Process):
         device, caps_str = select_video_caps()
         return {'device': str(device), 'caps_str': caps_str}
 
+    def _get_available_video_modes(self, **kwargs):
+        from ..video_mode import get_available_video_modes
+
+        return get_available_video_modes()
+
+    def _get_video_source_configs(self, **kwargs):
+        from ..video_mode import get_video_source_configs
+
+        return get_video_source_configs()
+
     def _stop(self, **kwargs):
         response = self.pm.pipeline.set_state(gst.STATE_NULL)
         return response

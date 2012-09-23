@@ -49,9 +49,35 @@ class Rectangle(object):
 
 class DrawQueue(object):
     '''
-    A list of draw commands, stored as callables that, are
-    passed a set of parameters to draw on from the canvas
-    implementation.
+    A list of draw commands, appended by calling the method corresponding to
+    the cairo action to be performed.  These commands can then be rendered by
+    calling the render() method, passing in the cairo context to draw on.
+
+    For example:
+
+    >>> dq = DrawQueue()
+
+    Add some commands to the drawing queue
+
+    >>> dq.set_source_rgb(1, 1, 1)
+    >>> dq.paint()
+    >>> dq.move_to(10, 0)
+    >>> dq.rectangle(0, 0, 20, 20)
+    >>> dq.set_source_rgb(0, 0, 0)
+    >>> dq.fill()
+
+    Create a surface and context
+
+    >>> surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, 200, 200)
+    >>> ctx = cairo.Context(surface)
+
+    Run deferred rendering
+
+    >>> draw_queue_pickle = pickle.dumps(dq)
+    >>> draw_queue = pickle.loads(draw_queue_pickle)
+    >>> draw_queue.render(ctx)
+
+    >>> surface.write_to_png('output.png')
     '''
     def __init__(self, render_callables = None):
         self.render_callables = render_callables or deque()
@@ -91,27 +117,3 @@ class DrawQueue(object):
 
     def rectangle(self, *args):
         self.append(Rectangle(*args))
-
-
-if __name__ == '__main__':
-    #### /drawing closures
-    dq = DrawQueue()
-
-    # Add some commands to the drawing queue
-    dq.set_source_rgb(1, 1, 1)
-    dq.paint()
-    dq.move_to(10, 0)
-    dq.rectangle(0, 0, 20, 20)
-    dq.set_source_rgb(0, 0, 0)
-    dq.fill()
-
-    # Create a surface and context
-    surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, 200, 200)
-    ctx = cairo.Context(surface)
-
-    # run defered rendering
-    draw_queue_pickle = pickle.dumps(dq)
-    draw_queue = pickle.loads(draw_queue_pickle)
-    draw_queue.render(ctx)
-
-    surface.write_to_png('output.png')

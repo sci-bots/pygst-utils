@@ -23,31 +23,23 @@ from path import path
 
 import pygst_utils
 from pygst_utils.video_view.gtk_view import GtkVideoView
-from pygst_utils.bin.server import server_popen
-from gst_video_source_caps_query.gst_video_source_caps_query import\
-        DeviceNotFound, GstVideoSourceManager, FilteredInput
-from gst_video_source_caps_query.video_mode_dialog import create_form_view,\
-        get_video_mode_map, get_video_mode_enum, get_available_video_modes,\
-                get_video_source_configs
-from pygtkhelpers.ui.extra_widgets import Filepath
+from pygst_utils.video_source import GstVideoSourceManager
+from pygst_utils.bin.server import WindowServiceProxy
+from pygtkhelpers.ui.extra_widgets import Filepath, Enum, Form
+from pygtkhelpers.ui.form_view_dialog import create_form_view
 from pygtkhelpers.ui.dialogs import error
-from flatland import Form, Integer
+from flatland import Integer
 from flatland.validation import ValueAtLeast, ValueAtMost
 
 
 class GTKGStreamerWindow(object):
-    try:
-        video_modes = get_available_video_modes(
-                format_='YUY2')
-        video_mode_map = get_video_mode_map(video_modes)
+    with WindowServiceProxy(port=59000) as w:
+        video_mode_map = w.get_video_mode_map()
         video_mode_keys = sorted(video_mode_map.keys())
-        device_key, devices = get_video_source_configs()
-        if video_mode_keys:
-            _video_available = True
-        else:
-            _video_available = False
-    except DeviceNotFound:
-        _video_available = False
+        device_key, devices = w.get_video_source_configs()
+
+    if not video_mode_keys:
+        raise DeviceNotFound
 
     def __init__(self):
         window = gtk.Window(gtk.WINDOW_TOPLEVEL)
@@ -59,7 +51,8 @@ class GTKGStreamerWindow(object):
         hbox = gtk.HBox()
         vbox.pack_start(hbox, expand=False)
 
-        form = Form.of(get_video_mode_enum().using(
+        video_mode_enum = Enum.named('video_mode').valued(*self.video_mode_keys)
+        form = Form.of(video_mode_enum.using(
                 default=self.video_mode_keys[0]), Filepath.named('output_path')\
                         .using(default=''), Integer.named('bitrate').using(
                                 default=150, validators=[ValueAtLeast(
@@ -127,19 +120,19 @@ class GTKGStreamerWindow(object):
         self.movie_window.set_size_request(640, 480)
         self.aframe.show_all()
 
-        # Start JSON-RPC server to control GStreamer video pipeline.
+        # Use GStreamer WindowServiceProxy to control GStreamer video
+        # pipeline.  Behind the scenes, it runs GStreamer in a separate
+        # process (subprocess.Popen), exposed through a JSON-RPC
+        # interface.
         # There are issues with the GTK gui freezing when the
         # GStreamer pipeline is started here directly.
-        self._server = server_popen()
-        time.sleep(1)
-        # Connect to JSON-RPC server and request to run the pipeline
-        s = Server('http://localhost:8080')
+        self._server = WindowServiceProxy(port=59000)
 
-        s.create_process(self.movie_view.window_xid)
-        s.create_pipeline(self.movie_view.window_xid,
+        self._server.create_process(self.movie_view.window_xid)
+        self._server.create_pipeline(self.movie_view.window_xid,
                 self.get_video_device_and_caps_str(), self.output_path,
                         self.bitrate)
-        s.start_pipeline(self.movie_view.window_xid)
+        self._server.start_pipeline(self.movie_view.window_xid)
 
         self.video_mode_field.proxy.widget.set_button_sensitivity(gtk.SENSITIVITY_OFF)
         self.output_path_field.widget.set_sensitive(False)
@@ -148,14 +141,9 @@ class GTKGStreamerWindow(object):
         self.button.set_label("Stop")
 
     def stop(self):
-        s = Server('http://localhost:8080')
-        s.stop_pipeline(self.movie_view.window_xid)
-        s.terminate_process(self.movie_view.window_xid)
-        self._server.kill()
+        self._server.stop_pipeline(self.movie_view.window_xid)
+        # Terminate GStreamer service server
         self._server = None
-        #self.aframe.remove(self.movie_window)
-        #del self.movie_view
-        #self.movie_view = None
         self.button.set_label("Start")
         self.video_mode_field.proxy.widget.set_button_sensitivity(gtk.SENSITIVITY_AUTO)
         self.output_path_field.widget.set_sensitive(True)

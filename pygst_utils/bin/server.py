@@ -48,7 +48,7 @@ class WindowServiceProxy(object):
         self._initialized = False
         while not self._initialized:
             server_process = server_popen(port)
-            time.sleep(1)
+            time.sleep(0.25)
             if server_process.poll() and server_process.returncode != 0:
                 raise ConnectionError, 'Error starting server on port {}'\
                         .format(port)
@@ -75,6 +75,14 @@ class WindowServiceProxy(object):
         if window_xid is None:
             window_xid = 0
         result = self._server.get_video_mode_map(window_xid)
+        return pickle.loads(str(result))
+
+    @override
+    def get_video_source_configs(self, window_xid=None):
+        if window_xid is None:
+            window_xid = 0
+        result = self._server.get_video_source_configs(window_xid)
+        time.sleep(0.2)
         return pickle.loads(str(result))
 
     @override

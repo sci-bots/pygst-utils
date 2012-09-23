@@ -61,6 +61,26 @@ class WindowService(object):
         print 'args={}'.format(args)
 
     @register
+    def get_available_video_modes(self, window_xid):
+        '''
+        Return a list of dictionaries describing the available video modes.
+
+        For example:
+
+        {'device': path('/dev/v4l/by-id/usb-Vimicro_Vimicro_USB_Camera__Altair_-video-index0'),
+            'dimensions': (160, 120),
+            'fourcc': 'YV12',
+            'framerate': Fps(num=30, denom=1),
+            'height': 120,
+            'interlaced': False,
+            'name': 'video/x-raw-yuv',
+            'width': 160}
+        '''
+        process = self.processes[window_xid]
+        return pickle.dumps(process(command='get_available_video_modes',
+                ack=True)['response'])
+
+    @register
     def select_video_mode(self, window_xid):
         '''
         Launch a GTK prompt to select a video mode.
@@ -118,6 +138,12 @@ class WindowService(object):
     def get_video_mode_enum(self, window_xid):
         process = self.processes[window_xid]
         result = process(command='get_video_mode_enum', ack=True)
+        return pickle.dumps(result['response'])
+
+    @register
+    def get_video_source_configs(self, window_xid):
+        process = self.processes[window_xid]
+        result = process(command='get_video_source_configs', ack=True)
         return pickle.dumps(result['response'])
 
     @register
