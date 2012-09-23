@@ -20,11 +20,11 @@ def base_path():
     return path(pygst_utils.__file__).parent.joinpath('bin')
 
 
-def server_popen():
+def server_popen(port):
     if hasattr(sys, 'frozen'):
-        server_process = Popen([base_path().joinpath('server.exe')], stdout=PIPE, stderr=PIPE)
+        server_process = Popen([base_path().joinpath('server.exe'), str(port)], stdout=PIPE, stderr=PIPE)
     else:
-        server_process = Popen([sys.executable, base_path().joinpath('server.py')], stdout=PIPE, stderr=PIPE)
+        server_process = Popen([sys.executable, base_path().joinpath('server.py'), str(port)], stdout=PIPE, stderr=PIPE)
     return server_process
 
 
@@ -37,14 +37,24 @@ def override(f):
     return f
 
 
+class ConnectionError(Exception): pass
+
+
 class WindowServiceProxy(object):
-    def __init__(self):
+    def __init__(self, port=8080):
         global override_methods
 
         self._override_methods = override_methods
-        self._server_process = server_popen()
-        time.sleep(1)
-        self._server = Server('http://localhost:8080')
+        self._initialized = False
+        while not self._initialized:
+            server_process = server_popen(port)
+            time.sleep(1)
+            if server_process.poll() and server_process.returncode != 0:
+                raise ConnectionError, 'Error starting server on port {}'\
+                        .format(port)
+            self._server_process = server_process
+            self._initialized = True
+        self._server = Server('http://localhost:{}'.format(port))
         self._methods = set(self._server.system.listMethods())
         self._server.create_process(0)
         self._pids = [self._server.get_pid(),
@@ -72,11 +82,20 @@ class WindowServiceProxy(object):
         if window_xid is None:
             window_xid = 0
         result = self._server.select_video_mode(window_xid)
+        time.sleep(0.2)
         return pickle.loads(str(result))
 
     @override
-    def create_process(self, window_xid):
-        result = self._server.create_process(window_xid)
+    def select_video_caps(self, window_xid=None):
+        if window_xid is None:
+            window_xid = 0
+        result = self._server.select_video_caps(window_xid)
+        time.sleep(0.2)
+        return result
+
+    @override
+    def create_process(self, window_xid, force_aspect_ratio=True):
+        result = self._server.create_process(window_xid, force_aspect_ratio)
         pid = self._server.get_process_pid(window_xid)
         self._pids.append(pid)
         return result
@@ -91,14 +110,32 @@ class WindowServiceProxy(object):
         self.close()
 
     def close(self):
-        for pid in self._pids:
-            os.kill(pid, signal.SIGKILL)
+        if self._initialized:
+            for pid in self._pids:
+                try:
+                    os.kill(pid, signal.SIGKILL)
+                except:
+                    continue
+            self._initialized = False
+
+
+def parse_args():
+    """Parses arguments, returns (options, args)."""
+    from argparse import ArgumentParser
+
+    parser = ArgumentParser(description='Run GStreamer WindowService server')
+    parser.add_argument('port', default=8080, type=int, nargs='?')
+    args = parser.parse_args()
+
+    return args
 
 
 if __name__ == '__main__':
-    logging.basicConfig(format='[%(levelname)s] %(message)s', loglevel=logging.DEBUG)
+    logging.basicConfig(format='[%(levelname)s] %(message)s',
+            loglevel=logging.DEBUG)
 
-    service = WindowService()
+    args = parse_args()
+    service = WindowService(port=args.port)
     logging.info('Starting server')
 
     service.run()
