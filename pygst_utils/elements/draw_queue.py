@@ -47,6 +47,43 @@ class Rectangle(object):
         ctx.rectangle(self.x, self.y, self.w, self.h)
 
 
+class Stroke(object):
+    def __call__(self, ctx):
+        ctx.stroke()
+
+
+class StrokePreserve(object):
+    def __call__(self, ctx):
+        ctx.stroke_preserve()
+
+
+class SetLineWidth(object):
+    def __init__(self, line_width):
+        self.line_width = line_width
+
+    def __call__(self, ctx):
+        ctx.set_line_width(self.line_width)
+
+
+class Save(object):
+    def __call__(self, ctx):
+        ctx.save()
+
+
+class Restore(object):
+    def __call__(self, ctx):
+        ctx.restore()
+
+
+class Scale(object):
+    def __init__(self, sx, sy):
+        self.sx = sx
+        self.sy = sy
+
+    def __call__(self, ctx):
+        ctx.scale(self.sx, self.sy)
+
+
 class DrawQueue(object):
     '''
     A list of draw commands, appended by calling the method corresponding to
@@ -117,3 +154,31 @@ class DrawQueue(object):
 
     def rectangle(self, *args):
         self.append(Rectangle(*args))
+
+    def stroke(self, *args):
+        self.append(Stroke(*args))
+
+    def save(self, *args):
+        self.append(Save(*args))
+
+    def restore(self, *args):
+        self.append(Restore(*args))
+
+    def scale(self, *args): self.append(Scale(*args))
+    def stroke_preserve(self, *args): self.append(StrokePreserve(*args))
+    def set_line_width(self, *args): self.append(SetLineWidth(*args))
+
+
+def get_example_draw_queue(width, height):
+    draw_queue = DrawQueue()
+    draw_queue.save()
+    draw_queue.scale(width, height)
+    draw_queue.move_to(0.4, 0.4)
+    draw_queue.set_line_width(0.02)
+    draw_queue.rectangle(0.4, 0.4, 0.2, 0.2)
+    draw_queue.set_source_rgb(1, 1, 1)
+    draw_queue.stroke_preserve()
+    draw_queue.set_source_rgb(0, 0, 0)
+    draw_queue.fill()
+    draw_queue.restore()
+    return draw_queue

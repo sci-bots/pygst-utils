@@ -140,9 +140,10 @@ class CairoDrawBase(gst.BaseTransform):
 
 
 class CairoDrawQueue(CairoDrawBase):
-    def __init__(self, name, draw_queue=None):
-        self.draw_queue = draw_queue
-        super(CairoDrawQueue, self).__init__(name, self.render_draw_queue)
+    def __init__(self, name):
+        self.draw_queue = None
+        super(CairoDrawQueue, self).__init__(name,
+                draw_func=self.render_draw_queue)
 
     def render_draw_queue(self, buf):
         if self.draw_queue:
