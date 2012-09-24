@@ -117,6 +117,13 @@ class WindowProcess(Process):
         response = self.pm.pipeline.set_state(gst.STATE_NULL)
         return response
 
+    def _set_warp_transform(self, transform_str=None, **kwargs):
+        if transform_str is None:
+            return
+        warp_bin = self.pm.pipeline.get_by_name('warp_bin')
+        if warp_bin:
+            warp_bin.warper.set_property('transform-matrix', transform_str)
+
     def _scale(self, width=None, height=None, **kwargs):
         if width is None or height is None:
             return None
@@ -133,7 +140,8 @@ class WindowProcess(Process):
                 kwargs.get('bitrate', None),
                         kwargs.get('output_path', None),
                         kwargs.get('draw_queue', None),
-                        kwargs.get('with_scale', False))
+                        kwargs.get('with_scale', False),
+                        kwargs.get('with_warp', False))
         return response
 
     def _join(self, **kwargs):
@@ -143,15 +151,15 @@ class WindowProcess(Process):
     ### utility methods ####################################################
 
     def create(self, device, caps_str, bitrate=None, record_path=None,
-            draw_queue=None, with_scale=False):
+            draw_queue=None, with_scale=False, with_warp=False):
         from ..video_mode import create_video_source
 
         def init_pipeline(pm, device, caps_str, bitrate, record_path,
-                draw_queue, with_scale):
+                draw_queue, with_scale, with_warp):
             video_source = create_video_source(device, caps_str)
             pipeline = get_pipeline(video_source, bitrate, record_path,
-                    draw_queue, with_scale=with_scale)
+                    draw_queue, with_scale=with_scale, with_warp=with_warp)
             pm.pipeline = pipeline
             return pm.pipeline.set_state(gst.STATE_READY)
         return init_pipeline(self.pm, device, caps_str, bitrate, record_path,
-                draw_queue, with_scale=with_scale)
+                draw_queue, with_scale, with_warp)

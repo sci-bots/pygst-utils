@@ -62,7 +62,7 @@ class warp_perspective(gst.BaseTransform):
         __author__
     )
     __gproperties__ = {
-        'transform_matrix': (
+        'transform-matrix': (
             gobject.TYPE_STRING,
             'Transformation matrix',
             'Comma-separated transformation matrix values',

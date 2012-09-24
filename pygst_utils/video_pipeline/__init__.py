@@ -15,10 +15,11 @@ gobject.threads_init()
 
 from ..elements.cairo_draw import CairoDrawBase, CairoDrawQueue
 from ..elements.draw_queue import DrawQueue
+from ..elements.warp_perspective import WarpBin
 
 
 def get_pipeline(video_source, bitrate=None, output_path=None, draw_queue=None,
-            with_scale=False):
+            with_scale=False, with_warp=False):
     pipeline = gst.Pipeline('pipeline')
 
     video_rate = gst.element_factory_make('videorate', 'video_rate')
@@ -38,6 +39,12 @@ def get_pipeline(video_source, bitrate=None, output_path=None, draw_queue=None,
 
     gst.element_link_many(video_tee, display_queue)
     display_pre_sink = display_queue
+
+    if with_warp:
+        warp_bin = WarpBin('warp_bin')
+        pipeline.add(warp_bin)
+        gst.element_link_many(display_pre_sink, warp_bin)
+        display_pre_sink = warp_bin
 
     if with_scale:
         video_scale = gst.element_factory_make('videoscale', 'video_scale')
