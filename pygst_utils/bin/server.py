@@ -24,7 +24,9 @@ def server_popen(port):
     if hasattr(sys, 'frozen'):
         server_process = Popen([base_path().joinpath('server.exe'), str(port)], stdout=PIPE, stderr=PIPE)
     else:
-        server_process = Popen([sys.executable, base_path().joinpath('server.py'), str(port)], stdout=PIPE, stderr=PIPE)
+        server_process = Popen([sys.executable,
+                base_path().joinpath('server.py'), str(port)], stdout=PIPE,
+                        stderr=PIPE, env={'GST_DEBUG_DUMP_DOT_DIR': '/tmp'})
     return server_process
 
 
@@ -99,6 +101,20 @@ class WindowServiceProxy(object):
             window_xid = 0
         result = self._server.select_video_caps(window_xid)
         time.sleep(0.2)
+        return result
+
+    @override
+    def create_pipeline(self, window_xid, video_settings, output_path=None,
+            bitrate=None, draw_queue=None):
+        if draw_queue:
+            draw_queue_pickle = pickle.dumps(draw_queue)
+        else:
+            draw_queue_pickle = None
+        print '[WindowServiceProxy] create_pipeline: draw_queue_pickle={}'.format(draw_queue_pickle)
+        result = self._server.create_pipeline(window_xid, video_settings,
+                output_path, bitrate, draw_queue_pickle)
+        pid = self._server.get_process_pid(window_xid)
+        self._pids.append(pid)
         return result
 
     @override

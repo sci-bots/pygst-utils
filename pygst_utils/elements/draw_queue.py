@@ -2,8 +2,8 @@ try:
     import cPickle as pickle
 except ImportError:
     import pickle
+from functools import partial
 from collections import deque
-import cairo
 
 
 class DrawQueue(object):
@@ -14,6 +14,7 @@ class DrawQueue(object):
 
     For example:
 
+    >>> import cairo
     >>> dq = DrawQueue()
 
     Add some commands to the drawing queue
@@ -38,10 +39,43 @@ class DrawQueue(object):
 
     >>> surface.write_to_png('output.png')
     '''
+
+    # Note that the following list of methods will be added as attributes.
+    # Each method represents a cairo draw command.  By calling any of these
+    # methods on a DrawQueue instance, the corresponding command (along with
+    # the specified arguments) will be recorded to be played back using the
+    # render() method.
+    cairo_methods = ['restore', 'save', 'scale', 'move_to', 'set_line_width',
+            'rectangle', 'set_source_rgb', 'stroke_preserve', 'set_source_rgb',
+                    'fill', ]
+
     def __init__(self, render_callables=None):
         self.render_callables = render_callables or deque()
 
-    def append(self, attr, args):
+        # Dynamically add the methods listed in cairo_methods
+        self._add_methods()
+
+    def __getstate__(self):
+        data_dict = self.__dict__.copy()
+        # Since instance methods may not be pickled, remove all dynamically
+        # added methods before pickling.  These methods can be added again
+        # using the _add_methods() method.
+        for f in self.cairo_methods:
+            if f in data_dict:
+                del data_dict[f]
+        return data_dict
+
+    def __setstate__(self, data_dict):
+        self.__dict__ = data_dict
+        # Since instance methods are not pickled, dynamically add the methods
+        # listed in cairo_method.
+        self._add_methods()
+
+    def _add_methods(self):
+        for f in self.cairo_methods:
+            setattr(self, f, partial(self.append, f))
+
+    def append(self, attr, *args): #self, attr, args):
         '''
         Add a render callable to the queue
         '''
@@ -54,13 +88,6 @@ class DrawQueue(object):
         if self.render_callables:
             for attr, args in self.render_callables:
                 getattr(cairo_ctx, attr)(*args)
-
-    def __getattr__(self, attr):
-        if hasattr(self, attr):
-            return object.__getattribute__(self, attr)
-        else:
-            append = object.__getattribute__(self, 'append')
-            return lambda *args: append(attr, args)
 
 
 def get_example_draw_queue(width, height):

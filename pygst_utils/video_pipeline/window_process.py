@@ -117,11 +117,23 @@ class WindowProcess(Process):
         response = self.pm.pipeline.set_state(gst.STATE_NULL)
         return response
 
+    def _scale(self, width=None, height=None, **kwargs):
+        if width is None or height is None:
+            return None
+        caps_filter = self.pm.pipeline.get_by_name('video_scale_caps_filter')
+        if not caps_filter:
+            return None
+        caps_str = 'video/x-raw-yuv,width={},height={}'.format(width, height)
+        caps = gst.Caps(caps_str)
+        caps_filter.set_property('caps', caps)
+        print '[_scale] width={} height={} DONE'.format(width, height)
+
     def _create(self, **kwargs):
-        print '[_create] kwargs={}'.format(kwargs)
         response = self.create(kwargs['device'], kwargs['caps_str'],
                 kwargs.get('bitrate', None),
-                        kwargs.get('output_path', None))
+                        kwargs.get('output_path', None),
+                        kwargs.get('draw_queue', None),
+                        kwargs.get('with_scale', False))
         return response
 
     def _join(self, **kwargs):
@@ -130,12 +142,16 @@ class WindowProcess(Process):
 
     ### utility methods ####################################################
 
-    def create(self, device, caps_str, bitrate=None, record_path=None):
+    def create(self, device, caps_str, bitrate=None, record_path=None,
+            draw_queue=None, with_scale=False):
         from ..video_mode import create_video_source
 
-        def init_pipeline(pm, device, caps_str, bitrate, record_path):
+        def init_pipeline(pm, device, caps_str, bitrate, record_path,
+                draw_queue, with_scale):
             video_source = create_video_source(device, caps_str)
-            pipeline = get_pipeline(video_source, bitrate, record_path)
+            pipeline = get_pipeline(video_source, bitrate, record_path,
+                    draw_queue, with_scale=with_scale)
             pm.pipeline = pipeline
             return pm.pipeline.set_state(gst.STATE_READY)
-        return init_pipeline(self.pm, device, caps_str, bitrate, record_path)
+        return init_pipeline(self.pm, device, caps_str, bitrate, record_path,
+                draw_queue, with_scale=with_scale)
