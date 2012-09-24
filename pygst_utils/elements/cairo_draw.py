@@ -3,6 +3,10 @@ __author__ = 'Christian Fobel <christian@fobel.net>'
 
 import traceback
 from math import pi
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle
 
 import gst
 import gobject
@@ -80,6 +84,15 @@ class CairoDrawBase(gst.BaseTransform):
         __doc__.strip(),
         __author__
     )
+    __gproperties__ = {
+        'draw-queue': (
+            gobject.TYPE_STRING,
+            'Pickle-dumped DrawQueue instance',
+            'Pickle-dump string of DrawQueue instance',
+            'N.', # Default to None
+            gobject.PARAM_READWRITE | gobject.PARAM_CONSTRUCT
+        ),
+    }
     __gsttemplates__ = (
         gst.PadTemplate("sink",
             gst.PAD_SINK, gst.PAD_ALWAYS,
@@ -137,6 +150,16 @@ class CairoDrawBase(gst.BaseTransform):
         except:
             print "Failed cairo render"
             traceback.print_exc()
+
+    def do_set_property(self, prop, val):
+        """gobject->set_property virtual method."""
+        if prop.name == 'draw-queue':
+            self.draw_queue = pickle.loads(val)
+
+    def do_get_property(self, prop):
+        """gobject->get_property virtual method."""
+        if prop.name == 'draw-queue':
+            return pickle.dumps(self.draw_queue)
 
 
 class CairoDrawQueue(CairoDrawBase):

@@ -1,4 +1,8 @@
 import sys
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle
 
 from path import path
 import gst
@@ -45,15 +49,14 @@ if __name__ == '__main__':
     def update_draw_queue_generator(pipeline, draw_queue_func):
         state_data = pipeline.get_state()
         while state_data[1] != gst.STATE_PLAYING:
-            print '[update_draw_queue] state_data={}'.format(state_data)
             yield True
         video_sink = pipeline.get_by_name('video_sink')
         cairo_draw = pipeline.get_by_name('cairo_draw')
         sink_pad = video_sink.get_pad('sink')
         caps = sink_pad.get_negotiated_caps().get_structure(0)
         cairo_draw = pipeline.get_by_name('cairo_draw')
-        cairo_draw.draw_queue = draw_queue_func(caps['width'],
-                caps['height'])
+        cairo_draw.set_property('draw-queue', pickle.dumps(
+                draw_queue_func(caps['width'], caps['height'])))
         yield False
 
     update_draw_queue = update_draw_queue_generator(pipeline,
