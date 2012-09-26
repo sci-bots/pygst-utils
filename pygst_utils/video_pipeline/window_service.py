@@ -177,7 +177,7 @@ class WindowService(object):
     @register
     def create_pipeline(self, window_xid, video_settings, output_path=None,
             bitrate=None, draw_queue_pickle=None, with_scale=True,
-                    with_warp=True):
+                    with_warp=True, with_frame_grab=True):
         '''
         Create a new GStreamer pipeline with the specified video settings.
         '''
@@ -194,7 +194,9 @@ class WindowService(object):
         process(command='create', device=str(device), caps_str=str(caps_str),
                 output_path=output_path, bitrate=bitrate,
                         draw_queue=draw_queue, with_scale=with_scale,
-                                with_warp=with_warp, ack=True)
+                                with_warp=with_warp,
+                                        with_frame_grab=with_frame_grab,
+                                                ack=True)
 
     @register
     def scale(self, window_xid, width, height):
@@ -204,6 +206,22 @@ class WindowService(object):
         process = self.processes[window_xid]
         process(command='scale', width=width, height=height)
 
+    @register
+    def get_frame(self, window_xid):
+        '''
+        Request that a frame be grabbed from the video stream.
+        '''
+        process = self.processes[window_xid]
+        response = process(command='get_frame', ack=True)['response']
+        return pickle.dumps(response)
+
+    @register
+    def request_frame(self, window_xid):
+        '''
+        Request that a frame be grabbed from the video stream.
+        '''
+        process = self.processes[window_xid]
+        process(command='request_frame')
 
     @register
     def set_warp_transform(self, window_xid, transform_str):

@@ -18,6 +18,7 @@ class WindowProcess(Process):
         self.parent_pipe, self.child_pipe = Pipe()
         self.window_xid = window_xid
         self.pm = None
+        self.last_frame = None
 
     def __call__(self, **kwargs):
         logging.debug('{}'.format(kwargs.get('command', None)))
@@ -117,6 +118,11 @@ class WindowProcess(Process):
         response = self.pm.pipeline.set_state(gst.STATE_NULL)
         return response
 
+    def _request_frame(self, **kwargs):
+        frame_grabber = self.pm.pipeline.get_by_name('grab_frame')
+        if frame_grabber:
+            frame_grabber.set_property('grab-requested', True)
+
     def _set_warp_transform(self, transform_str=None, **kwargs):
         if transform_str is None:
             return
@@ -141,25 +147,38 @@ class WindowProcess(Process):
                         kwargs.get('output_path', None),
                         kwargs.get('draw_queue', None),
                         kwargs.get('with_scale', False),
-                        kwargs.get('with_warp', False))
+                        kwargs.get('with_warp', False),
+                        kwargs.get('with_frame_grab', True))
         return response
 
     def _join(self, **kwargs):
         gtk.main_quit()
         return False
 
+    def _get_frame(self, **kwargs):
+        return self.last_frame
+
+    def on_frame_grabbed(self, frame):
+        self.last_frame = frame
+
     ### utility methods ####################################################
 
     def create(self, device, caps_str, bitrate=None, record_path=None,
-            draw_queue=None, with_scale=False, with_warp=False):
+            draw_queue=None, with_scale=False, with_warp=False,
+                    with_frame_grab=True):
         from ..video_mode import create_video_source
 
         def init_pipeline(pm, device, caps_str, bitrate, record_path,
-                draw_queue, with_scale, with_warp):
+                draw_queue, with_scale, with_warp, with_frame_grab):
             video_source = create_video_source(device, caps_str)
+            if with_frame_grab:
+                on_frame_grabbed = self.on_frame_grabbed
+            else:
+                on_frame_grabbed = None
             pipeline = get_pipeline(video_source, bitrate, record_path,
-                    draw_queue, with_scale=with_scale, with_warp=with_warp)
+                    draw_queue, with_scale=with_scale, with_warp=with_warp,
+                    on_frame_grabbed=on_frame_grabbed)
             pm.pipeline = pipeline
             return pm.pipeline.set_state(gst.STATE_READY)
         return init_pipeline(self.pm, device, caps_str, bitrate, record_path,
-                draw_queue, with_scale, with_warp)
+                draw_queue, with_scale, with_warp, with_frame_grab)

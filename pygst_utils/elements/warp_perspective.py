@@ -8,6 +8,26 @@ import numpy as np
 from opencv.safe_cv import cv
 
 
+
+def cv2array(im):
+  depth2dtype = {
+        cv.IPL_DEPTH_8U: 'uint8',
+        cv.IPL_DEPTH_8S: 'int8',
+        cv.IPL_DEPTH_16U: 'uint16',
+        cv.IPL_DEPTH_16S: 'int16',
+        cv.IPL_DEPTH_32S: 'int32',
+        cv.IPL_DEPTH_32F: 'float32',
+        cv.IPL_DEPTH_64F: 'float64',
+    }
+
+  a = np.fromstring(
+         im.tostring(),
+         dtype=depth2dtype[im.depth],
+         count=im.width*im.height*im.nChannels)
+  a.shape = (im.height,im.width,im.nChannels)
+  return a
+
+
 def array2cv(a):
     dtype2depth = {
             'uint8':   cv.IPL_DEPTH_8U,
@@ -36,7 +56,7 @@ def registered_element(class_):
         @gstlal_element_register
         class foo(gst.Element):
             ...
-    
+
     Until then, you have to do::
 
         class foo(gst.Element):
@@ -142,6 +162,68 @@ class warp_perspective(gst.BaseTransform):
         #outbuf[:len(data)] = data
         outbuf[:width * height * 3] = warped.tostring()[:]
 
+        # Done!
+        return gst.FLOW_OK
+
+
+@registered_element
+class grab_frame(gst.BaseTransform):
+    '''
+    Grab a frame on request.
+    '''
+    __gstdetails__ = (
+        "Grab a frame on request",
+        "Filter",
+        __doc__.strip(),
+        __author__
+    )
+    __gsttemplates__ = (
+        gst.PadTemplate("sink",
+            gst.PAD_SINK, gst.PAD_ALWAYS,
+            gst.caps_from_string('video/x-raw-rgb,depth=24')
+        ),
+        gst.PadTemplate("src",
+            gst.PAD_SRC, gst.PAD_ALWAYS,
+            gst.caps_from_string('video/x-raw-rgb,depth=24')
+        )
+    )
+    __gproperties__ = {
+        'grab-requested': (
+            gobject.TYPE_BOOLEAN,
+            'Frame grab requested',
+            '',
+            False,
+            gobject.PARAM_READWRITE | gobject.PARAM_CONSTRUCT
+        ),
+    }
+
+    def __init__(self, name, on_frame_grabbed):
+        super(grab_frame, self).__init__()
+        self.set_property('name', name)
+        self.on_frame_grabbed = on_frame_grabbed
+
+    def do_set_property(self, prop, val):
+        """gobject->set_property virtual method."""
+        if prop.name == 'grab-requested':
+            self.grab_requested = True
+
+    def do_start(self):
+        """GstBaseTransform->start virtual method."""
+        self.grab_requested = False
+        return True
+
+    def do_transform(self, inbuf, outbuf):
+        """GstBaseTransform->transform virtual method."""
+        if self.grab_requested:
+            self.grab_requested = False
+            struct = inbuf.caps[0]
+            width, height = struct['width'], struct['height']
+
+            a = np.fromstring(inbuf.data, dtype='uint8',
+                    count=width * height * 3)
+            a.shape = (height, width, 3)
+            self.on_frame_grabbed(a)
+        outbuf[:len(inbuf)] = inbuf[:]
         # Done!
         return gst.FLOW_OK
 
