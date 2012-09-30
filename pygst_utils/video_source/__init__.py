@@ -90,12 +90,11 @@ class GstVideoSourceManager(object):
     def get_caps_string(extracted_cap):
         return '{name:s},width={width:d},height={height:d},fourcc={fourcc:s},'\
                 'framerate={framerate.num:d}/{framerate.denom:d}'.format(**extracted_cap)
-    
+
     def _query_device_extracted_caps(self, pipe_conn, dimensions=None,
             framerate=None, format_=None, name=None):
         extracted_device_caps = {}
         for video_device, video_caps in self._device_iter():
-            print video_device, video_caps
             final_caps = []
             combined_caps = video_caps.get_extracted_allowed_caps(
                     dimensions=dimensions, framerate=framerate, format_=format_,
@@ -303,14 +302,14 @@ Queries for supported video modes for GStreamer input devices.""",
                     action='store', dest='stream_name',
                     help='stream name (e.g., "video/x-raw-yuv")')
     args = parser.parse_args()
-    
+
     return args
 
 
 def format_cap(c):
     return '[{width:4d} {height:4d} {fps:2.0f}fps '\
         '({fourcc:s})]'.format(fps=c['framerate'].num / c['framerate'].denom, **c)
-                                                                 
+
 
 def main():
     args = parse_args()

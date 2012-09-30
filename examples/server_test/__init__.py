@@ -41,9 +41,10 @@ if __name__ == '__main__':
     s.create_pipeline(xid,
             ('/dev/v4l/by-id/usb-Vimicro_Vimicro_USB_Camera__Altair_-video-index0',
             'video/x-raw-yuv,width=320,height=240,fourcc=YUY2,framerate=30/1'),
-            'test.avi', 150000, pickle.dumps(get_example_draw_queue(1920,
-            1080)), True, True)
-    s.scale(xid, 1920, 1080)
+            'test.avi', 150000, pickle.dumps(get_example_draw_queue(500,
+            #None, None, pickle.dumps(get_example_draw_queue(500,
+            600)), True, True)
+    s.scale(xid, 500, 600)
     s.start_pipeline(xid)
 
     transform_matrix = np.array(yaml.load('''\
@@ -60,10 +61,9 @@ if __name__ == '__main__':
             s.request_frame(xid)
             frame = None
             while frame is None:
-                time.sleep(1)
+                time.sleep(0.1)
                 frame = pickle.loads(str(s.get_frame(xid)))
-            time.sleep(1)
             # =========================================================
-        time.sleep(2)
+        time.sleep(8)
     finally:
         stop(s, xid)

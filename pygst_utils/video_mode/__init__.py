@@ -153,7 +153,6 @@ class _GStreamerProcess(Process):
             '''
             if self.pipeline is None:
                 device, caps_str = request['video_caps']
-                print '''{'device': %s, 'caps_str': %s}''' % (device, caps_str)
                 video_source = create_video_source(device, caps_str)
                 self.pipeline = get_pipeline(video_source)
         elif request['command'] == 'start':

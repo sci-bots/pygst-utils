@@ -12,8 +12,6 @@ except ImportError:
 import blinker
 import decimal
 from jsonrpclib.SimpleJSONRPCServer import SimpleJSONRPCServer
-import gobject
-gobject.threads_init()
 
 from window_process import WindowProcess
 from ..elements.draw_queue import DrawQueue
@@ -33,7 +31,7 @@ class WindowService(object):
         global methods
 
         self._methods = methods
-        self.server = SimpleJSONRPCServer((hostname, port))
+        self.server = SimpleJSONRPCServer((hostname, port), logRequests=False)
         self.server.register_introspection_functions()
         for method in self._methods:
             self.server.register_function(eval('self.{}'.format(method)))
@@ -59,7 +57,7 @@ class WindowService(object):
 
     @register
     def dump_args(self, args):
-        print 'args={}'.format(args)
+        logging.info('args={}'.format(args))
 
     @register
     def get_available_video_modes(self, window_xid):
@@ -187,7 +185,7 @@ class WindowService(object):
             try:
                 draw_queue = pickle.loads(str(draw_queue_pickle))
             except (Exception, ), why:
-                print why
+                logging.warning(str(why))
                 draw_queue = None
         else:
             draw_queue = None

@@ -24,11 +24,11 @@ from path import path
 import pygst_utils
 from pygst_utils.video_view.gtk_view import GtkVideoView
 from pygst_utils.video_source import GstVideoSourceManager
-from pygst_utils.bin.server import WindowServiceProxy
+from pygst_utils.video_pipeline.window_service_proxy import WindowServiceProxy
 from pygtkhelpers.ui.extra_widgets import Filepath, Enum, Form
 from pygtkhelpers.ui.form_view_dialog import create_form_view
 from pygtkhelpers.ui.dialogs import error
-from flatland import Integer
+from flatland import Integer, String
 from flatland.validation import ValueAtLeast, ValueAtMost
 
 
@@ -52,19 +52,20 @@ class GTKGStreamerWindow(object):
         vbox.pack_start(hbox, expand=False)
 
         video_mode_enum = Enum.named('video_mode').valued(*self.video_mode_keys)
-        form = Form.of(video_mode_enum.using(
-                default=self.video_mode_keys[0]), Filepath.named('output_path')\
-                        .using(default=''), Integer.named('bitrate').using(
-                                default=150, validators=[ValueAtLeast(
-                                        minimum=25)], properties={'step': 25,
-                                                'label': 'Bitrate (KB/s)', }))
+        form = Form.of(
+            video_mode_enum.using(default=self.video_mode_keys[0]),
+            Filepath.named('output_path').using(default=''),
+            Integer.named('bitrate').using(default=150, validators=[ValueAtLeast(
+                    minimum=25)], properties={'step': 25,
+                            'label': 'Bitrate (KB/s)', }),
+            String.named('transform_string').using(default='1,0,0,0,1,0,0,0,1'),
+        )
         self.video_mode_form_view = create_form_view(form)
-        for field in ['video_mode', 'output_path', 'bitrate']:
+        for field in ['video_mode', 'output_path', 'bitrate', 'transform_string']:
             setattr(self, '%s_field' % field, self.video_mode_form_view.form\
                     .fields[field])
         self.video_mode_field.proxy.connect('changed', self._on_mode_changed)
         self.video_source = None
-        # Set default transform to identity
         hbox.add(self.video_mode_form_view.widget)
         self.button = gtk.Button("Start")
         hbox.pack_start(self.button, False)
@@ -73,7 +74,7 @@ class GTKGStreamerWindow(object):
                 obey_child=False)
 
         self.pipeline = None
-        self._server = None
+        self._proxy = None
 
         vbox.pack_start(self.aframe, expand=True)
         self.movie_view = GtkVideoView()
@@ -81,6 +82,17 @@ class GTKGStreamerWindow(object):
         self.aframe.add(self.movie_window)
         window.show_all()
         self.window = window
+
+    @property
+    def transform_str(self):
+        transform_string = self.video_mode_form_view.form\
+                .fields['transform_string'].element.value
+        data = [float(v) for v in transform_string.split(',')]
+        if len(data) != 9:
+            print '''
+                Transform string must be 9 comma-separated floats'''.strip()
+            return '1,0,0,0,1,0,0,0,1'
+        return ','.join(['{}'.format(v) for v in data])
 
     @property
     def bitrate(self):
@@ -126,31 +138,39 @@ class GTKGStreamerWindow(object):
         # interface.
         # There are issues with the GTK gui freezing when the
         # GStreamer pipeline is started here directly.
-        self._server = WindowServiceProxy(port=59000)
+        self._proxy = WindowServiceProxy(port=59000)
 
-        self._server.create_process(self.movie_view.window_xid)
-        self._server.create_pipeline(self.movie_view.window_xid,
-                self.get_video_device_and_caps_str(), self.output_path,
-                        self.bitrate)
-        self._server.start_pipeline(self.movie_view.window_xid)
+        try:
+            self._proxy.create_process(self.movie_view.window_xid)
+            self._proxy.create_pipeline(self.movie_view.window_xid,
+                    self.get_video_device_and_caps_str(), self.output_path,
+                            self.bitrate)
+            self._proxy.set_warp_transform(self.movie_view.window_xid, self.transform_str)
+            self._proxy.start_pipeline(self.movie_view.window_xid)
+        except (Exception, ), why:
+            print why
+            self.stop()
+            return
 
         self.video_mode_field.proxy.widget.set_button_sensitivity(gtk.SENSITIVITY_OFF)
+        self.transform_string_field.widget.set_sensitive(False)
         self.output_path_field.widget.set_sensitive(False)
         self.bitrate_field.widget.set_sensitive(False)
 
         self.button.set_label("Stop")
 
     def stop(self):
-        self._server.stop_pipeline(self.movie_view.window_xid)
+        self._proxy.stop_pipeline(self.movie_view.window_xid)
         # Terminate GStreamer service server
-        self._server = None
+        self._proxy = None
         self.button.set_label("Start")
         self.video_mode_field.proxy.widget.set_button_sensitivity(gtk.SENSITIVITY_AUTO)
+        self.transform_string_field.widget.set_sensitive(True)
         self.output_path_field.widget.set_sensitive(True)
         self.bitrate_field.widget.set_sensitive(True)
 
     def on_destroy(self, *args):
-        if self._server:
+        if self._proxy:
             self.stop()
         gtk.main_quit()
 
