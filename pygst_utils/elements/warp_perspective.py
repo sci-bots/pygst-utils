@@ -152,14 +152,10 @@ class warp_perspective(gst.BaseTransform):
         cv_img = cv.CreateMat(height, width, cv.CV_8UC3)
         cv.SetData(cv_img, inbuf.data, width * 3)
         warped = cv.CreateMat(height, width, cv.CV_8UC3)
+        flags = cv.CV_INTER_LINEAR | cv.CV_WARP_FILL_OUTLIERS\
+                | cv.CV_WARP_INVERSE_MAP
         cv.WarpPerspective(cv_img, warped, self.transform_matrix_cv,
-                flags=cv.CV_WARP_INVERSE_MAP)
-#
-        #warped = cv.CreateMat(height, width, cv.CV_8UC3)
-        #cv.WarpPerspective(cv_img, warped, self.transform_matrix_cv,
-                #flags=cv.CV_WARP_INVERSE_MAP)
-        #data = warped.tostring()
-        #outbuf[:len(data)] = data
+                flags=flags)
         outbuf[:width * height * 3] = warped.tostring()[:]
 
         # Done!
