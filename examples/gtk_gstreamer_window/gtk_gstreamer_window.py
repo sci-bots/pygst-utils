@@ -28,7 +28,7 @@ from pygst_utils.video_pipeline.window_service_proxy import WindowServiceProxy
 from pygtkhelpers.ui.extra_widgets import Filepath, Enum, Form
 from pygtkhelpers.ui.form_view_dialog import create_form_view
 from pygtkhelpers.ui.dialogs import error
-from flatland import Integer, String
+from flatland import Integer, String, Boolean
 from flatland.validation import ValueAtLeast, ValueAtMost
 
 
@@ -59,9 +59,11 @@ class GTKGStreamerWindow(object):
                     minimum=25)], properties={'step': 25,
                             'label': 'Bitrate (KB/s)', }),
             String.named('transform_string').using(default='1,0,0,0,1,0,0,0,1'),
+            Boolean.named('draw_cairo').using(default=False),
         )
         self.video_mode_form_view = create_form_view(form)
-        for field in ['video_mode', 'output_path', 'bitrate', 'transform_string']:
+        for field in ['video_mode', 'output_path', 'bitrate',
+                'transform_string', 'draw_cairo']:
             setattr(self, '%s_field' % field, self.video_mode_form_view.form\
                     .fields[field])
         self.video_mode_field.proxy.connect('changed', self._on_mode_changed)
@@ -93,6 +95,10 @@ class GTKGStreamerWindow(object):
                 Transform string must be 9 comma-separated floats'''.strip()
             return '1,0,0,0,1,0,0,0,1'
         return ','.join(['{}'.format(v) for v in data])
+
+    @property
+    def draw_cairo(self):
+        return self.video_mode_form_view.form.fields['draw_cairo'].element.value
 
     @property
     def bitrate(self):
@@ -138,15 +144,24 @@ class GTKGStreamerWindow(object):
         # interface.
         # There are issues with the GTK gui freezing when the
         # GStreamer pipeline is started here directly.
+        from pygst_utils.elements.draw_queue import get_example_draw_queue
+        if self.draw_cairo:
+            print 'using draw_queue'
+            x, y, width, height = self.movie_window.get_allocation()
+            draw_queue = get_example_draw_queue(width, height)
+        else:
+            print 'NOT using draw_queue'
+            draw_queue = None
         self._proxy = WindowServiceProxy(port=59000)
 
         try:
             self._proxy.create_process(self.movie_view.window_xid)
             self._proxy.create_pipeline(self.movie_view.window_xid,
                     self.get_video_device_and_caps_str(), self.output_path,
-                            self.bitrate)
+                            self.bitrate, draw_queue=draw_queue)
             self._proxy.set_warp_transform(self.movie_view.window_xid, self.transform_str)
             self._proxy.start_pipeline(self.movie_view.window_xid)
+            self._proxy.scale(self.movie_view.window_xid, width, height)
         except (Exception, ), why:
             print why
             self.stop()
