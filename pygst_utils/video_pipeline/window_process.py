@@ -168,6 +168,11 @@ class WindowProcess(Process):
         gtk.main_quit()
         return False
 
+    def _pop_frame(self, **kwargs):
+        frame = self.last_frame
+        self.last_frame = None
+        return frame
+
     def _get_frame(self, **kwargs):
         return self.last_frame
 

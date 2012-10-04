@@ -214,9 +214,20 @@ class WindowService(object):
         process(command='scale', width=width, height=height)
 
     @register
+    def pop_frame(self, window_xid):
+        '''
+        Retrieve the last frame that was grabbed, and reset the
+        last_frame to None.  This provides a mechanism to detect if a
+        new frame has been grabbed since the last frame was requested.
+        '''
+        process = self.processes[window_xid]
+        response = process(command='pop_frame', ack=True)['response']
+        return pickle.dumps(response)
+
+    @register
     def get_frame(self, window_xid):
         '''
-        Request that a frame be grabbed from the video stream.
+        Retrieve the last frame that was grabbed, leaving it set.
         '''
         process = self.processes[window_xid]
         response = process(command='get_frame', ack=True)['response']
