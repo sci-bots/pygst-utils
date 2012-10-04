@@ -10,6 +10,8 @@ import gst
 import gtk
 gtk.threads_init()
 
+from ..video_source import DeviceNotFound
+
 
 class WindowProcess(Process):
     def __init__(self, window_xid, force_aspect_ratio=True):
@@ -91,7 +93,11 @@ class WindowProcess(Process):
     def _get_video_mode_map(self, **kwargs):
         from ..video_mode import get_video_mode_map
 
-        return get_video_mode_map()
+        try:
+            result = get_video_mode_map()
+        except DeviceNotFound:
+            result = {}
+        return result
 
     def _select_video_mode(self, **kwargs):
         from ..video_mode import select_video_mode
