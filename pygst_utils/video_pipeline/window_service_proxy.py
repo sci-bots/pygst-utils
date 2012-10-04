@@ -53,7 +53,7 @@ class WindowServiceProxy(object):
     def __getattr__(self, attr):
         if attr in self._methods and attr not in self._override_methods:
             result = getattr(self._server, attr)
-            time.sleep(0.2)
+            #time.sleep(0.2)
             return result
         else:
             return object.__getattribute__(self, attr)

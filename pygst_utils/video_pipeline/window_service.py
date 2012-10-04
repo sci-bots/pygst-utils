@@ -189,6 +189,7 @@ class WindowService(object):
                 draw_queue = None
         else:
             draw_queue = None
+        print draw_queue
         process(command='create', device=str(device), caps_str=str(caps_str),
                 output_path=output_path, bitrate=bitrate,
                         draw_queue=draw_queue, with_scale=with_scale,
