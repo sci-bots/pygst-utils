@@ -87,7 +87,7 @@ def select_video_source():
 
 
 def create_video_source(device, caps_str):
-    if device is None:
+    if not device:
         # Assume blank video test src
         video_source = gst.element_factory_make('videotestsrc', 'video_source')
         video_source.set_property('pattern', 2)

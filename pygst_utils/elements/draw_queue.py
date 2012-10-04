@@ -1,7 +1,4 @@
-try:
-    import cPickle as pickle
-except ImportError:
-    import pickle
+from __future__ import division
 from functools import partial
 from collections import deque
 
@@ -14,6 +11,7 @@ class DrawQueue(object):
 
     For example:
 
+    >>> import pickle
     >>> import cairo
     >>> dq = DrawQueue()
 
@@ -46,8 +44,9 @@ class DrawQueue(object):
     # the specified arguments) will be recorded to be played back using the
     # render() method.
     cairo_methods = ['restore', 'save', 'scale', 'move_to', 'set_line_width',
-            'rectangle', 'set_source_rgb', 'stroke_preserve', 'set_source_rgb',
-                    'fill', ]
+            'line_to', 'close_path',
+            'rectangle', 'set_source_rgb', 'stroke_preserve', 'set_source_rgba',
+                    'fill', 'translate', 'stroke', 'fill_preserve']
 
     def __init__(self, render_callables=None):
         self.render_callables = render_callables or deque()
@@ -90,16 +89,17 @@ class DrawQueue(object):
                 getattr(cairo_ctx, attr)(*args)
 
 
-def get_example_draw_queue(width, height):
+def get_example_draw_queue(width, height, fill_color=(0, 0, 0),
+        stroke_color=(1, 1, 1)):
     draw_queue = DrawQueue()
     draw_queue.save()
     draw_queue.scale(width, height)
     draw_queue.move_to(0.1, 0.1)
     draw_queue.set_line_width(0.02)
     draw_queue.rectangle(0.1, 0.1, 0.2, 0.2)
-    draw_queue.set_source_rgb(1, 1, 1)
+    draw_queue.set_source_rgb(*stroke_color)
     draw_queue.stroke_preserve()
-    draw_queue.set_source_rgb(0, 0, 0)
+    draw_queue.set_source_rgb(*fill_color)
     draw_queue.fill()
     draw_queue.restore()
     return draw_queue

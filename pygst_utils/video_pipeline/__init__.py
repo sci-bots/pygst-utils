@@ -22,16 +22,14 @@ def get_pipeline(video_source, bitrate=None, output_path=None, draw_queue=None,
             with_scale=False, with_warp=False, on_frame_grabbed=None):
     pipeline = gst.Pipeline('pipeline')
 
+    pipeline.add(video_source)
+    video_source.set_state(gst.STATE_READY)
+
     video_rate = gst.element_factory_make('videorate', 'video_rate')
-    rate_caps = gst.Caps('video/x-raw-yuv,framerate=%(num)d/%(denom)s'\
-            % get_framerate(video_source))
-    rate_caps_filter = gst.element_factory_make('capsfilter',
-            'rate_caps_filter')
-    rate_caps_filter.set_property('caps', rate_caps)
 
     video_tee = gst.element_factory_make('tee', 'video_tee')
-    pipeline.add(video_source, video_rate, rate_caps_filter, video_tee)
-    gst.element_link_many(video_source, video_rate, rate_caps_filter, video_tee)
+    pipeline.add(video_rate, video_tee)
+    gst.element_link_many(video_source, video_rate, video_tee)
 
     display_queue = gst.element_factory_make('queue', 'display_queue')
     video_sink = gst.element_factory_make('autovideosink', 'video_sink')
