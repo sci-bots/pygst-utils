@@ -63,6 +63,12 @@ class WindowServiceProxy(object):
         return tuple(self._pids)
 
     @override
+    def set_draw_queue(self, window_xid, draw_queue):
+        draw_queue_pickle = pickle.dumps(draw_queue)
+        result = self._server.set_draw_queue(window_xid, draw_queue_pickle)
+        return result
+
+    @override
     def get_video_mode_map(self, window_xid=None):
         if window_xid is None:
             window_xid = 0

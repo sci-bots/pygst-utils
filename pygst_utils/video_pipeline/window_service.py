@@ -197,6 +197,14 @@ class WindowService(object):
                                                 ack=True)
 
     @register
+    def set_draw_queue(self, window_xid, draw_queue_pickle):
+        '''
+        Set the cairo draw queue.
+        '''
+        process = self.processes[window_xid]
+        process(command='set_draw_queue', draw_queue=draw_queue_pickle)
+
+    @register
     def scale(self, window_xid, width, height):
         '''
         Stop the GStreamer pipeline.

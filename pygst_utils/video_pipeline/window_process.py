@@ -129,6 +129,13 @@ class WindowProcess(Process):
         if frame_grabber:
             frame_grabber.set_property('grab-requested', True)
 
+    def _set_draw_queue(self, draw_queue=None, **kwargs):
+        if draw_queue is None:
+            return
+        cairo_draw = self.pm.pipeline.get_by_name('cairo_draw')
+        if cairo_draw:
+            cairo_draw.set_property('draw-queue', draw_queue)
+
     def _set_warp_transform(self, transform_str=None, **kwargs):
         if transform_str is None:
             return
