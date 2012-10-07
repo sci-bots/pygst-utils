@@ -42,15 +42,12 @@ def get_pipeline(video_source, bitrate=None, output_path=None, draw_queue=None,
         grab_frame_color_in = gst.element_factory_make('ffmpegcolorspace',
                 'grab_frame_color_in')
         grab_frame_ = grab_frame('grab_frame', on_frame_grabbed)
-        pipeline.add(grab_frame_color_in, grab_frame_)
-        gst.element_link_many(display_pre_sink, grab_frame_color_in, grab_frame_)
-        display_pre_sink = grab_frame_
-
-    if with_warp:
-        warp_bin = WarpBin('warp_bin')
-        pipeline.add(warp_bin)
-        gst.element_link_many(display_pre_sink, warp_bin)
-        display_pre_sink = warp_bin
+        grab_frame_color_out= gst.element_factory_make('ffmpegcolorspace',
+                'grab_frame_color_out')
+        pipeline.add(grab_frame_color_in, grab_frame_, grab_frame_color_out)
+        gst.element_link_many(display_pre_sink, grab_frame_color_in,
+                grab_frame_, grab_frame_color_out)
+        display_pre_sink = grab_frame_color_out
 
     if with_scale:
         video_scale = gst.element_factory_make('videoscale', 'video_scale')
@@ -58,6 +55,12 @@ def get_pipeline(video_source, bitrate=None, output_path=None, draw_queue=None,
         pipeline.add(video_scale, caps_filter)
         gst.element_link_many(display_pre_sink, video_scale, caps_filter)
         display_pre_sink = caps_filter
+
+    if with_warp:
+        warp_bin = WarpBin('warp_bin')
+        pipeline.add(warp_bin)
+        gst.element_link_many(display_pre_sink, warp_bin)
+        display_pre_sink = warp_bin
 
     if draw_queue:
         cairo_color_in = gst.element_factory_make('ffmpegcolorspace',
