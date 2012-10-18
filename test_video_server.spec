@@ -1,27 +1,23 @@
 # -*- mode: python -*-
 from path import path
+import gst
+import pygst_utils
+import flatland
+import opencv
 import pygtkhelpers
-import matplotlib
 
 
 extra_py = []
 a = Analysis([os.path.join(HOMEPATH,'support\\_mountzlib.py'),
             os.path.join(HOMEPATH,'support\\useUnicode.py'),
-            'server.py'] + extra_py,
-            excludes=['opencv', 'flatland', 'pygtkhelpers'])
+            'pygst_utils/bin/server.py'] + extra_py,
+            excludes=['gst', 'pygst_utils', 'opencv', 'flatland', 'pygtkhelpers'])
 
-for mod in [pygtkhelpers]:
+for mod in [gst, pygst_utils, flatland, opencv, pygtkhelpers]:
 	mod_path = path(mod.__file__).parent
 	a.datas += [(str(mod_path.parent.relpathto(p)), str(p.abspath()), 'DATA')\
 		    for p in mod_path.walkfiles(ignore=[r'\.git', r'site_scons',
                     r'.*\.pyc'])]
-
-a.datas += [(str(path('.').relpathto(p)), str(p.abspath()), 'DATA')
-        for p in path('opencv').walkfiles(ignore=[r'\.git', r'site_scons',
-                r'.*\.pyc'])]
-a.datas += [(str(path('.').relpathto(p)), str(p.abspath()), 'DATA')
-        for p in path('flatland').walkfiles(ignore=[r'\.git', r'site_scons',
-                r'.*\.pyc'])]
 
 
 pyz = PYZ(a.pure)

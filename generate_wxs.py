@@ -18,11 +18,11 @@ WXS_TEMPLATE = '''\
                 Comments='GStreamer_test'
                 Manufacturer='Christian Fobel'
                 InstallerVersion='200' Compressed='yes' />
- 
+
         <Media Id='1' Cabinet='product.cab' EmbedCab='yes' />
 
         <WixVariable Id="WixUILicenseRtf" Value="License.rtf" />
- 
+
         <Upgrade Id="048f3511-0a49-11e1-a03e-080027963a76">
             <UpgradeVersion OnlyDetect="yes" Minimum="{{ version }}" Property="NEWERVERSIONDETECTED" IncludeMinimum="no" />
             <UpgradeVersion OnlyDetect="no" Maximum="{{ version }}" Property="OLDERVERSIONBEINGUPGRADED" IncludeMaximum="no" />
@@ -44,7 +44,7 @@ WXS_TEMPLATE = '''\
     <!-- Step 2: Add the shortcut to your installer package -->
     <DirectoryRef Id="ApplicationProgramsFolder">
         <Component Id="ApplicationShortcut" Guid="9f3fb577-2e2f-4a53-8df2-9e9f7fcb79a6" >
-            <Shortcut Id="ApplicationStartMenuShortcut" Name="GStreamer_test" 
+            <Shortcut Id="ApplicationStartMenuShortcut" Name="GStreamer_test"
                 Description="My Application Description"
                 Target="[{{ root }}]gstreamer_test_video.exe"
                         WorkingDirectory="{{ root }}"/>
@@ -52,10 +52,10 @@ WXS_TEMPLATE = '''\
             <RegistryValue Root="HKCU" Key="Software\Microsoft\GStreamer_test" Name="installed" Type="integer" Value="1" KeyPath="yes"/>
         </Component>
     </DirectoryRef>
- 
+
     <Feature Id='{{ id }}' Title='{{ title }}' Level='1'>{% for c in components %}
         <ComponentRef Id='{{ c.id }}' />{% endfor %}
-        <ComponentRef Id="ApplicationShortcut" />   
+        <ComponentRef Id="ApplicationShortcut" />
     </Feature>
 
     <Property Id="WIXUI_INSTALLDIR" Value="{{ root }}" />
@@ -80,7 +80,7 @@ class Component(object):
         else:
             self.filename = self.filepath.name
         self.source = self.filepath
-        
+
     def _get_guid(self):
         md5 = self.filepath._hash('md5')
         md5.update(self.filepath)
@@ -167,7 +167,7 @@ def generate_wxs(root_path, version):
     dw = DirectoryWalker()
     root = dw.xml_tree(root_path)
 
-    extra_dirs = ['opencv', 'flatland', 'server', 'pygtkhelpers', 'etc', 'support', 'share']
+    extra_dirs = ['pygst_utils', 'opencv', 'flatland', 'server', 'pygtkhelpers', ]
     children = dict([(name, dw.xml_tree(root_path.joinpath(name),
             recursive=True)) for name in extra_dirs])
 
@@ -200,7 +200,7 @@ Generates a WiX input file for GStreamer_test.""",
                     required=True,
                     help='install version')
     args = parser.parse_args()
-    
+
     return args
 
 
