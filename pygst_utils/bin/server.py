@@ -4,12 +4,16 @@ import sys
 from subprocess import Popen
 
 from path import path
-import pygst_utils
-from pygst_utils.video_pipeline.window_service import WindowService
 
 
 def base_path():
-    return path(pygst_utils.__file__).parent.joinpath('bin')
+    return path(__file__).parent.parent.joinpath('bin')
+
+package_root = base_path().parent.parent
+sys.path.insert(0, package_root)
+
+import pygst_utils
+from pygst_utils.video_pipeline.window_service import WindowService
 
 
 def server_popen(port):

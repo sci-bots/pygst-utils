@@ -30,6 +30,7 @@ class WindowServiceProxy(object):
 
         global override_methods
 
+        self._port = port
         self._override_methods = override_methods
         self._server_process = server_popen(port)
         self._server = Server('http://localhost:{}'.format(port))
@@ -47,8 +48,8 @@ class WindowServiceProxy(object):
             raise
 
         self._server.create_process(0)
-        self._pids = [self._server.get_pid(),
-                self._server.get_process_pid(0)]
+        #self._pids = [self._server.get_pid(),
+        self._pids = [self._server.get_process_pid(0)]
 
     def __getattr__(self, attr):
         if attr in self._methods and attr not in self._override_methods:
@@ -59,8 +60,16 @@ class WindowServiceProxy(object):
             return object.__getattribute__(self, attr)
 
     @property
+    def port(self):
+        return self._port
+
+    @property
     def pids(self):
         return tuple(self._pids)
+
+    def add_pid(self, pid):
+        if pid not in self.pids:
+            self._pids.append(pid)
 
     @override
     def set_draw_queue(self, window_xid, draw_queue):
@@ -109,14 +118,14 @@ class WindowServiceProxy(object):
         result = self._server.create_pipeline(window_xid, video_settings,
                 output_path, bitrate, draw_queue_pickle)
         pid = self._server.get_process_pid(window_xid)
-        self._pids.append(pid)
+        self.add_pid(pid)
         return result
 
     @override
     def create_process(self, window_xid, force_aspect_ratio=True):
         result = self._server.create_process(window_xid, force_aspect_ratio)
         pid = self._server.get_process_pid(window_xid)
-        self._pids.append(pid)
+        self.add_pid(pid)
         return result
 
     def __enter__(self):
@@ -130,9 +139,12 @@ class WindowServiceProxy(object):
 
     def close(self):
         if self._initialized:
-            for pid in self._pids:
-                try:
-                    os.kill(pid, signal.SIGKILL)
-                except:
-                    continue
+            self._server_process.terminate()
+            for pid in self.pids:
+                print '[WindowServiceProxy] close: kill pid {}'.format(pid)
+                if os.name == 'nt':
+                    sig = signal.SIGTERM
+                else:
+                    sig = signal.SIGKILL
+                os.kill(pid, sig)
             self._initialized = False
