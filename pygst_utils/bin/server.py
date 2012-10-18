@@ -9,6 +9,7 @@ from path import path
 import platform
 import blinker
 import decimal
+import pygtk
 import gtk
 import gst
 import cgi
@@ -21,7 +22,8 @@ import numpy
 def base_path():
     p = path(__file__).parent.abspath()
     attempted_paths = []
-    while p and not p.joinpath('pygst_utils_windows_server').isdir():
+    while p != path('/').abspath()\
+            and not p.joinpath('pygst_utils_windows_server').isdir():
         attempted_paths.append(p)
         p = p.parent
     if not p:
@@ -39,12 +41,13 @@ from pygst_utils.video_pipeline.window_service import WindowService
 
 def server_popen(port):
     if hasattr(sys, 'frozen'):
-        exe_path = base_path().joinpath('server.exe')
-        server_process = Popen([exe_path, str(port)]) #, stdout=PIPE, stderr=PIPE)
+        import pygst_utils_windows_server
+        exe_path = path(pygst_utils_windows_server.__path__[0]).joinpath(
+                'server.exe')
+        server_process = Popen([exe_path, str(port)], cwd=exe_path.parent)
     else:
         server_process = Popen([sys.executable,
                 base_path().joinpath('server.py'), str(port)])
-        # stdout=PIPE, stderr=PIPE, env={'GST_DEBUG_DUMP_DOT_DIR': '/tmp'})
     return server_process
 
 
