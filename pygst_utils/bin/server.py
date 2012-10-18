@@ -5,6 +5,18 @@ from subprocess import Popen
 
 from path import path
 
+# --- IMPORTS FOR DISCOVERY BY PYINSTALLER ---
+import platform
+import blinker
+import decimal
+import gtk
+import gst
+import cgi
+import jsonrpclib
+import jsonrpclib.SimpleJSONRPCServer
+import numpy
+# ############################################
+
 
 def base_path():
     return path(__file__).parent.parent.joinpath('bin')

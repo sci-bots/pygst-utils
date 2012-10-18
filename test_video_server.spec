@@ -14,9 +14,9 @@ a = Analysis([os.path.join(HOMEPATH,'support\\_mountzlib.py'),
             excludes=['gst', 'pygst_utils', 'opencv', 'flatland', 'pygtkhelpers'])
 
 for mod in [gst, pygst_utils, flatland, opencv, pygtkhelpers]:
-	mod_path = path(mod.__file__).parent
-	a.datas += [(str(mod_path.parent.relpathto(p)), str(p.abspath()), 'DATA')\
-		    for p in mod_path.walkfiles(ignore=[r'\.git', r'site_scons',
+    mod_path = path(mod.__file__).parent
+    a.datas += [(str(mod_path.parent.relpathto(p)), str(p.abspath()), 'DATA')\
+            for p in mod_path.walkfiles(ignore=[r'\.git', r'site_scons',
                     r'.*\.pyc'])]
 
 
