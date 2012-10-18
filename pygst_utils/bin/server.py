@@ -19,7 +19,16 @@ import numpy
 
 
 def base_path():
-    return path(__file__).parent.parent.joinpath('bin')
+    p = path(__file__).parent.abspath()
+    attempted_paths = []
+    while p and not p.joinpath('pygst_utils_windows_server').isdir():
+        attempted_paths.append(p)
+        p = p.parent
+    if not p:
+        raise RuntimeError, 'cannot find server.exe (attempted paths: %s)'\
+                % attempted_paths
+    return p.joinpath('pygst_utils_windows_server')
+
 
 package_root = base_path().parent.parent
 sys.path.insert(0, package_root)
@@ -30,7 +39,8 @@ from pygst_utils.video_pipeline.window_service import WindowService
 
 def server_popen(port):
     if hasattr(sys, 'frozen'):
-        server_process = Popen([base_path().joinpath('server.exe'), str(port)]) #, stdout=PIPE, stderr=PIPE)
+        exe_path = base_path().joinpath('server.exe')
+        server_process = Popen([exe_path, str(port)]) #, stdout=PIPE, stderr=PIPE)
     else:
         server_process = Popen([sys.executable,
                 base_path().joinpath('server.py'), str(port)])

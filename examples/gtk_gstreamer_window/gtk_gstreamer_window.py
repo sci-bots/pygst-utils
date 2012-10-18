@@ -9,6 +9,14 @@ if os.name == 'nt':
     import win32com
     import pythoncom
 
+import multiprocessing
+if hasattr(sys, 'frozen'):
+    print 'Enabling multiprocessing freeze support.'
+    multiprocessing.freeze_support()
+import pkgutil
+import platform
+import numpy
+
 try:
     import pygst
     pygst.require("0.10")
@@ -16,10 +24,13 @@ except ImportError:
     pass
 finally:
     import gst
+import jsonrpclib
+import jsonrpclib.SimpleJSONRPCServer
 from jsonrpclib import Server
 import blinker
 import decimal
 from path import path
+
 
 import pygst_utils
 from pygst_utils.video_view.gtk_view import GtkVideoView
