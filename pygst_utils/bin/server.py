@@ -23,13 +23,13 @@ def base_path():
     p = path(__file__).parent.abspath()
     attempted_paths = []
     while p != path('/').abspath()\
-            and not p.joinpath('pygst_utils_windows_server').isdir():
+            and not p.joinpath('pygst_utils').isdir():
         attempted_paths.append(p)
         p = p.parent
     if not p:
         raise RuntimeError, 'cannot find server.exe (attempted paths: %s)'\
                 % attempted_paths
-    return p.joinpath('pygst_utils_windows_server')
+    return p.joinpath('pygst_utils')
 
 
 package_root = base_path().parent.parent
@@ -44,10 +44,12 @@ def server_popen(port):
         import pygst_utils_windows_server
         exe_path = path(pygst_utils_windows_server.__path__[0]).joinpath(
                 'server.exe')
+        print '[server_popen] exe_path=%s' % exe_path
         server_process = Popen([exe_path, str(port)], cwd=exe_path.parent)
     else:
-        server_process = Popen([sys.executable,
-                base_path().joinpath('server.py'), str(port)])
+        script_path = base_path().joinpath('bin', 'server.py')
+        print '[server_popen] script_path=%s' % script_path
+        server_process = Popen([sys.executable, script_path, str(port)])
     return server_process
 
 

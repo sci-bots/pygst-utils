@@ -29,7 +29,7 @@ class PackageTar(object):
                 t.add(name, arcname)
 
 
-bld = Builder(action=PackageTar([
+bld = Builder(action=PackageTar(['support',
         ('server_setup.py', 'setup.py'),
         ('dist/gstreamer_test_video/pygst_utils_windows_server',
                 'pygst_utils_windows_server'),
