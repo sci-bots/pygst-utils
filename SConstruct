@@ -2,6 +2,7 @@ import tarfile
 import re
 import os
 import sys
+import zmq
 
 from path_find import path_find
 from path import path
@@ -30,6 +31,8 @@ class PackageTar(object):
 
 
 bld = Builder(action=PackageTar(['support',
+        (path(zmq.__path__[0]).joinpath('libzmq.dll'),
+                path('pygst_utils_windows_server').joinpath('libzmq.dll')),
         ('server_setup.py', 'setup.py'),
         ('dist/gstreamer_test_video/pygst_utils_windows_server',
                 'pygst_utils_windows_server'),

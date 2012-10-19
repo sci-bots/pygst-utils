@@ -16,6 +16,7 @@ import cgi
 import jsonrpclib
 import jsonrpclib.SimpleJSONRPCServer
 import numpy
+import zmq
 # ############################################
 
 
@@ -67,6 +68,7 @@ def parse_args():
 if __name__ == '__main__':
     logging.basicConfig(format='[%(levelname)s] %(message)s',
             loglevel=logging.CRITICAL)
+    print zmq
 
     args = parse_args()
     service = WindowService(port=args.port)
