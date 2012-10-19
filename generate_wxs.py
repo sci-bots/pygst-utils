@@ -167,7 +167,8 @@ def generate_wxs(root_path, version):
     dw = DirectoryWalker()
     root = dw.xml_tree(root_path)
 
-    extra_dirs = ['pygst_utils', 'opencv', 'flatland', 'server', 'pygtkhelpers', ]
+    extra_dirs = ['opencv', 'flatland', 'pygtkhelpers', 'pygst_utils',
+            'pygst_utils_windows_server']
     children = dict([(name, dw.xml_tree(root_path.joinpath(name),
             recursive=True)) for name in extra_dirs])
 

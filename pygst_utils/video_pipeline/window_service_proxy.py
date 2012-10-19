@@ -54,7 +54,6 @@ class WindowServiceProxy(object):
     def __getattr__(self, attr):
         if attr in self._methods and attr not in self._override_methods:
             result = getattr(self._server, attr)
-            #time.sleep(0.2)
             return result
         else:
             return object.__getattribute__(self, attr)
@@ -89,7 +88,7 @@ class WindowServiceProxy(object):
         if window_xid is None:
             window_xid = 0
         result = self._server.get_video_source_configs(window_xid)
-        time.sleep(0.2)
+        time.sleep(0.01)
         return pickle.loads(str(result))
 
     @override
@@ -97,7 +96,7 @@ class WindowServiceProxy(object):
         if window_xid is None:
             window_xid = 0
         result = self._server.select_video_mode(window_xid)
-        time.sleep(0.2)
+        time.sleep(0.01)
         return pickle.loads(str(result))
 
     @override
@@ -105,7 +104,7 @@ class WindowServiceProxy(object):
         if window_xid is None:
             window_xid = 0
         result = self._server.select_video_caps(window_xid)
-        time.sleep(0.2)
+        time.sleep(0.01)
         return result
 
     @override

@@ -37,7 +37,9 @@ class WindowProcess(Process):
         self.pm = PipelineManager(force_aspect_ratio=self.force_aspect_ratio)
         self.pm.window_xid = self.window_xid
 
-        gtk.timeout_add(500, self._update_state)
+        update_period_ms = 10
+        print 'using update period of %d ms' % update_period_ms
+        gtk.timeout_add(update_period_ms, self._update_state)
         gtk.main()
 
     def _update_state(self):
