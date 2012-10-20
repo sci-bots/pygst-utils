@@ -37,20 +37,25 @@ package_root = base_path().parent.parent
 sys.path.insert(0, package_root)
 
 import pygst_utils
-from pygst_utils.video_pipeline.window_service import WindowService
+from pygst_utils.video_pipeline.window_process import WindowProcess
 
 
-def server_popen(port):
+def server_popen(port, force_aspect_ratio=False):
+    print '[server_popen] force_aspect_ratio={}'.format(force_aspect_ratio)
+    command_args = [str(port)]
+    if force_aspect_ratio:
+        command_args.insert(0, '--force_aspect_ratio')
     if hasattr(sys, 'frozen'):
         import pygst_utils_windows_server
         exe_path = path(pygst_utils_windows_server.__path__[0]).joinpath(
                 'server.exe')
         print '[server_popen] exe_path=%s' % exe_path
-        server_process = Popen([exe_path, str(port)], cwd=exe_path.parent)
+        server_process = Popen([exe_path] + command_args, cwd=exe_path.parent)
     else:
         script_path = base_path().joinpath('bin', 'server.py')
         print '[server_popen] script_path=%s' % script_path
-        server_process = Popen([sys.executable, script_path, str(port)])
+        server_process = Popen([sys.executable, script_path] + command_args,
+                cwd=script_path.parent)
     return server_process
 
 
@@ -59,6 +64,7 @@ def parse_args():
     from argparse import ArgumentParser
 
     parser = ArgumentParser(description='Run GStreamer WindowService server')
+    parser.add_argument('--force_aspect_ratio', action='store_true')
     parser.add_argument('port', default=8080, type=int, nargs='?')
     args = parser.parse_args()
 
@@ -67,11 +73,22 @@ def parse_args():
 
 if __name__ == '__main__':
     logging.basicConfig(format='[%(levelname)s] %(message)s',
-            loglevel=logging.CRITICAL)
-    print zmq
+            loglevel=logging.INFO)
 
     args = parse_args()
-    service = WindowService(port=args.port)
-    logging.info('Starting server')
+    print args
+    service = WindowProcess(0, port=args.port,
+            force_aspect_ratio=args.force_aspect_ratio)
 
-    service.run()
+    logging.info('Starting server')
+    service.start()
+
+    port = service.parent_pipe.recv()
+    logging.info('Received port {} from child process'.format(port))
+
+    try:
+        service.join()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        service.terminate()

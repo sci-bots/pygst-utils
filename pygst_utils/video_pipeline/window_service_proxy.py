@@ -10,6 +10,8 @@ except ImportError:
 
 from pygst_utils.bin.server import server_popen
 
+import zmq
+from serialsocket import SerializingSocket
 
 override_methods = set()
 
@@ -24,37 +26,39 @@ def override(f):
 class ConnectionError(Exception): pass
 
 
-class WindowServiceProxy(object):
-    def __init__(self, port=8080):
-        from jsonrpclib import Server
+class DeferredCommand(object):
+    def __init__(self, command, sock):
+        self.command = command
+        self.sock = sock
 
+    def __call__(self, *args, **kwargs):
+        command_args = kwargs.copy()
+        command_args.update({'command': self.command, 'args': args or [],
+                'kwargs': kwargs or {}})
+        self.sock.send_zipped_pickle(command_args)
+        return self.sock.recv_zipped_pickle()
+
+
+class WindowServiceProxy(object):
+    def __init__(self, port=8080, force_aspect_ratio=False):
         global override_methods
 
+        print '[WindowServiceProxy] force_aspect_ratio={}'.format(force_aspect_ratio)
+        self._force_aspect_ratio = force_aspect_ratio
         self._port = port
         self._override_methods = override_methods
-        self._server_process = server_popen(port)
-        self._server = Server('http://localhost:{}'.format(port))
-        #time.sleep(3.0)
+        self._server_process = server_popen(port,
+                force_aspect_ratio=force_aspect_ratio)
+        self._ctx = zmq.Context.instance()
+        self._sock = SerializingSocket(self._ctx, zmq.REQ)
+        self._sock.connect('tcp://localhost:%d' % port)
         self._initialized = True
-        self._methods = None
-        for i in range(10):
-            try:
-                self._methods = set(self._server.system.listMethods())
-                break
-            except socket.error, why:
-                time.sleep(0.1 * (i + 1))
-        if self._methods is None:
-            self._initialized = False
-            raise
-
-        self._server.create_process(0)
-        #self._pids = [self._server.get_pid(),
-        self._pids = [self._server.get_process_pid(0)]
+        self._methods = set(['get_available_commands'])
+        self._methods = self._methods.union(set(self.get_available_commands()))
 
     def __getattr__(self, attr):
         if attr in self._methods and attr not in self._override_methods:
-            result = getattr(self._server, attr)
-            return result
+            return DeferredCommand(attr, self._sock)
         else:
             return object.__getattribute__(self, attr)
 
@@ -70,63 +74,6 @@ class WindowServiceProxy(object):
         if pid not in self.pids:
             self._pids.append(pid)
 
-    @override
-    def set_draw_queue(self, window_xid, draw_queue):
-        draw_queue_pickle = pickle.dumps(draw_queue)
-        result = self._server.set_draw_queue(window_xid, draw_queue_pickle)
-        return result
-
-    @override
-    def get_video_mode_map(self, window_xid=None):
-        if window_xid is None:
-            window_xid = 0
-        result = self._server.get_video_mode_map(window_xid)
-        return pickle.loads(str(result))
-
-    @override
-    def get_video_source_configs(self, window_xid=None):
-        if window_xid is None:
-            window_xid = 0
-        result = self._server.get_video_source_configs(window_xid)
-        time.sleep(0.01)
-        return pickle.loads(str(result))
-
-    @override
-    def select_video_mode(self, window_xid=None):
-        if window_xid is None:
-            window_xid = 0
-        result = self._server.select_video_mode(window_xid)
-        time.sleep(0.01)
-        return pickle.loads(str(result))
-
-    @override
-    def select_video_caps(self, window_xid=None):
-        if window_xid is None:
-            window_xid = 0
-        result = self._server.select_video_caps(window_xid)
-        time.sleep(0.01)
-        return result
-
-    @override
-    def create_pipeline(self, window_xid, video_settings, output_path=None,
-            bitrate=None, draw_queue=None):
-        if draw_queue:
-            draw_queue_pickle = pickle.dumps(draw_queue)
-        else:
-            draw_queue_pickle = None
-        result = self._server.create_pipeline(window_xid, video_settings,
-                output_path, bitrate, draw_queue_pickle)
-        pid = self._server.get_process_pid(window_xid)
-        self.add_pid(pid)
-        return result
-
-    @override
-    def create_process(self, window_xid, force_aspect_ratio=True):
-        result = self._server.create_process(window_xid, force_aspect_ratio)
-        pid = self._server.get_process_pid(window_xid)
-        self.add_pid(pid)
-        return result
-
     def __enter__(self):
         return self
 
@@ -138,12 +85,14 @@ class WindowServiceProxy(object):
 
     def close(self):
         if self._initialized:
-            self._server_process.terminate()
-            for pid in self.pids:
-                print '[WindowServiceProxy] close: kill pid {}'.format(pid)
-                if os.name == 'nt':
-                    sig = signal.SIGTERM
-                else:
-                    sig = signal.SIGKILL
-                os.kill(pid, sig)
-            self._initialized = False
+            try:
+                child_joined = False
+                self._sock.send_zipped_pickle({'command': 'join'})
+                for i in range(5):
+                    if self._sock.poll(50):
+                        self._sock.recv_zipped_pickle()
+                        child_joined = True
+            finally:
+                if not child_joined:
+                    self._server_process.terminate()
+                self._initialized = False

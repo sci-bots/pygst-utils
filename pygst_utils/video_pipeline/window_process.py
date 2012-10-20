@@ -3,6 +3,10 @@ import logging
 from multiprocessing import Process, Pipe
 import multiprocessing
 multiprocessing.freeze_support()
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle
 
 from __init__ import get_pipeline
 from pipeline_manager import PipelineManager
@@ -14,26 +18,31 @@ from ..video_source import DeviceNotFound
 
 
 class WindowProcess(Process):
-    def __init__(self, window_xid, force_aspect_ratio=True):
+    def __init__(self, window_xid, port=None, force_aspect_ratio=True):
         super(WindowProcess, self).__init__()
         self.force_aspect_ratio = force_aspect_ratio
         self.parent_pipe, self.child_pipe = Pipe()
         self.window_xid = window_xid
         self.pm = None
         self.last_frame = None
-
-    def __call__(self, **kwargs):
-        logging.debug('{}'.format(kwargs.get('command', None)))
-        request = kwargs
-        self.parent_pipe.send(request)
-        if request.get('ack', False):
-            return self.parent_pipe.recv()
-        return None
+        self.port = port
 
     def run(self):
         '''
         Method to be run in the child process.
         '''
+        import zmq
+        from serialsocket import SerializingSocket
+
+        self.ctx = zmq.Context.instance()
+        self.sock = SerializingSocket(self.ctx, zmq.REP)
+        if self.port is None:
+            self.port = self.sock.bind_to_random_port('tcp://*')
+        else:
+            self.sock.bind('tcp://*:%d' % self.port)
+        print 'socket bound to port %d' % self.port
+        self.child_pipe.send(self.port)
+
         self.pm = PipelineManager(force_aspect_ratio=self.force_aspect_ratio)
         self.pm.window_xid = self.window_xid
 
@@ -47,15 +56,14 @@ class WindowProcess(Process):
         This method will be called at regular intervals to handle any
         pending requests in the pipe.
         '''
-        while self.child_pipe.poll():
-            request = self.child_pipe.recv()
+        while self.sock.poll(timeout=10):
+            request = self.sock.recv_zipped_pickle()
             try:
                 threads_entered = False
                 gtk.threads_enter()
                 threads_entered = True
                 response = self._process_request(request)
-                if request.get('ack', False):
-                    self.child_pipe.send({'response': response})
+                self.sock.send_zipped_pickle(response)
             finally:
                 if threads_entered:
                     gtk.threads_leave()
@@ -66,9 +74,10 @@ class WindowProcess(Process):
         Execute the specified command by looking up the corresponding
         member function.
         '''
-        command_attr = '_%s' % request.get('command', None)
+        command_attr = '_command___%s' % request.get('command', None)
         if hasattr(self, command_attr):
-            return getattr(self, command_attr)(**request)
+            return getattr(self, command_attr)(*request.get('args', []),
+                    **request.get('kwargs', {}))
         else:
             logging.warning('Invalid command: %s' % request.get('command',
                     None))
@@ -76,23 +85,36 @@ class WindowProcess(Process):
 
     ### command-processing methods ####################################################
 
-    def _start(self, **kwargs):
+    def _command___get_available_commands(self):
+        command_prefix = '_command___'
+        return [k[len(command_prefix):] for k in dir(self)
+                if k.startswith(command_prefix)]
+
+    def _command___window_xid(self, window_xid):
+        if window_xid is not None:
+            self.pm.window_xid = window_xid
+        return self.pm.window_xid
+
+    def _command___start(self):
         response = self.pm.pipeline.set_state(gst.STATE_PLAYING)
         return response
 
-    def _get_pid(self, **kwargs):
+    def _command___pipeline_available(self):
+        return not (self.pm.pipeline is None)
+
+    def _command___get_pid(self):
         return os.getpid()
 
-    def _get_state(self, **kwargs):
+    def _command___get_state(self):
         response = self.pm.pipeline.get_state(gst.STATE_NULL)
         return response
 
-    def _get_video_mode_enum(self, **kwargs):
+    def _command___get_video_mode_enum(self):
         from ..video_mode import get_video_mode_enum
 
         return get_video_mode_enum()
 
-    def _get_video_mode_map(self, **kwargs):
+    def _command___get_video_mode_map(self):
         from ..video_mode import get_video_mode_map
 
         try:
@@ -101,51 +123,47 @@ class WindowProcess(Process):
             result = {}
         return result
 
-    def _select_video_mode(self, **kwargs):
+    def _command___select_video_mode(self):
         from ..video_mode import select_video_mode
 
         return select_video_mode()
 
-    def _select_video_caps(self, **kwargs):
+    def _command___select_video_caps(self):
         from ..video_mode import select_video_caps
 
         device, caps_str = select_video_caps()
         return {'device': str(device), 'caps_str': caps_str}
 
-    def _get_available_video_modes(self, **kwargs):
+    def _command___get_available_video_modes(self):
         from ..video_mode import get_available_video_modes
 
         return get_available_video_modes()
 
-    def _get_video_source_configs(self, **kwargs):
+    def _command___get_video_source_configs(self):
         from ..video_mode import get_video_source_configs
 
         return get_video_source_configs()
 
-    def _stop(self, **kwargs):
+    def _command___stop(self):
         response = self.pm.pipeline.set_state(gst.STATE_NULL)
         return response
 
-    def _request_frame(self, **kwargs):
+    def _command___request_frame(self):
         frame_grabber = self.pm.pipeline.get_by_name('grab_frame')
         if frame_grabber:
             frame_grabber.set_property('grab-requested', True)
 
-    def _set_draw_queue(self, draw_queue=None, **kwargs):
-        if draw_queue is None:
-            return
+    def _command___set_draw_queue(self, draw_queue):
         cairo_draw = self.pm.pipeline.get_by_name('cairo_draw')
         if cairo_draw:
-            cairo_draw.set_property('draw-queue', draw_queue)
+            cairo_draw.set_property('draw-queue', pickle.dumps(draw_queue))
 
-    def _set_warp_transform(self, transform_str=None, **kwargs):
-        if transform_str is None:
-            return
+    def _command___set_warp_transform(self, transform_str):
         warp_bin = self.pm.pipeline.get_by_name('warp_bin')
         if warp_bin:
             warp_bin.warper.set_property('transform-matrix', transform_str)
 
-    def _scale(self, width=None, height=None, **kwargs):
+    def _command___scale(self, width, height):
         if width is None or height is None:
             return None
         caps_filter = self.pm.pipeline.get_by_name('video_scale_caps_filter')
@@ -156,40 +174,28 @@ class WindowProcess(Process):
         caps_filter.set_property('caps', caps)
         print '[_scale] width={} height={} DONE'.format(width, height)
 
-    def _create(self, **kwargs):
-        response = self.create(kwargs['device'], kwargs['caps_str'],
-                kwargs.get('bitrate', None),
-                        kwargs.get('output_path', None),
-                        kwargs.get('draw_queue', None),
-                        kwargs.get('with_scale', False),
-                        kwargs.get('with_warp', False),
-                        kwargs.get('with_frame_grab', True))
-        return response
-
-    def _join(self, **kwargs):
+    def _command___join(self):
         gtk.main_quit()
         return False
 
-    def _pop_frame(self, **kwargs):
+    def _command___pop_frame(self):
         frame = self.last_frame
         self.last_frame = None
         return frame
 
-    def _get_frame(self, **kwargs):
+    def _command___get_frame(self):
         return self.last_frame
 
-    def on_frame_grabbed(self, frame):
-        self.last_frame = frame
-
-    ### utility methods ####################################################
-
-    def create(self, device, caps_str, bitrate=None, record_path=None,
+    def _command___create(self, device, caps_str, record_path=None, bitrate=None,
             draw_queue=None, with_scale=False, with_warp=False,
                     with_frame_grab=True):
         from ..video_mode import create_video_source
 
         def init_pipeline(pm, device, caps_str, bitrate, record_path,
                 draw_queue, with_scale, with_warp, with_frame_grab):
+            values = [device, caps_str, bitrate, record_path,
+                    draw_queue, with_scale, with_warp, with_frame_grab]
+            print 'init_pipeline args={}'.format(values)
             video_source = create_video_source(device, caps_str)
             if with_frame_grab:
                 on_frame_grabbed = self.on_frame_grabbed
@@ -202,3 +208,29 @@ class WindowProcess(Process):
             return pm.pipeline.set_state(gst.STATE_READY)
         return init_pipeline(self.pm, device, caps_str, bitrate, record_path,
                 draw_queue, with_scale, with_warp, with_frame_grab)
+
+    ### utility methods ####################################################
+
+    def on_frame_grabbed(self, frame):
+        self.last_frame = frame
+
+
+if __name__ == '__main__':
+    p = WindowProcess(0, 8888)
+    p.start()
+    port = p.parent_pipe.recv()
+    print 'Received port {} from child process'.format(port)
+
+    import zmq
+    from serialsocket import SerializingSocket
+
+    ctx = zmq.Context.instance()
+    req = SerializingSocket(ctx, zmq.REQ)
+    req.connect('tcp://localhost:%d' % port)
+    req.send_zipped_pickle({'command': 'select_video_mode'})
+    response = req.recv_zipped_pickle()
+    print response
+    try:
+        p.join()
+    except:
+        p.terminate()
