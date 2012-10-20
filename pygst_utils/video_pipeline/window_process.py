@@ -1,8 +1,6 @@
 import os
 import logging
 from multiprocessing import Process, Pipe
-import multiprocessing
-multiprocessing.freeze_support()
 try:
     import cPickle as pickle
 except ImportError:
@@ -216,6 +214,10 @@ class WindowProcess(Process):
 
 
 if __name__ == '__main__':
+    import multiprocessing
+
+    multiprocessing.freeze_support()
+
     p = WindowProcess(0, 8888)
     p.start()
     port = p.parent_pipe.recv()

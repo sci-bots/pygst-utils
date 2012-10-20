@@ -13,9 +13,9 @@ gtk.gdk.threads_init()
 import gobject
 gobject.threads_init()
 
-from ..elements.cairo_draw import CairoDrawBase, CairoDrawQueue
-from ..elements.draw_queue import DrawQueue
-from ..elements.warp_perspective import WarpBin, grab_frame
+from pygst_utils.elements.cairo_draw import CairoDrawBase, CairoDrawQueue
+from pygst_utils.elements.draw_queue import DrawQueue
+from pygst_utils.elements.warp_perspective import WarpBin, grab_frame
 
 
 def get_pipeline(video_source, bitrate=None, output_path=None, draw_queue=None,

@@ -17,6 +17,7 @@ import jsonrpclib
 import jsonrpclib.SimpleJSONRPCServer
 import numpy
 import zmq
+import multiprocessing
 # ############################################
 
 
@@ -72,6 +73,8 @@ def parse_args():
 
 
 if __name__ == '__main__':
+    multiprocessing.freeze_support()
+
     logging.basicConfig(format='[%(levelname)s] %(message)s',
             loglevel=logging.INFO)
 
