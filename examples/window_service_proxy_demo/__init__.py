@@ -17,8 +17,6 @@ def test_window_service():
 
 def test_window_service_proxy():
     with WindowServiceProxy() as w:
-        print 'WindowServiceProxy created successfully (pid={})'.format(
-            w.get_process_pid(0))
         print w.get_video_mode_map()
         print w.select_video_caps()
     print 'WindowServiceProxy closed successfully'

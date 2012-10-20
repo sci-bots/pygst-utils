@@ -166,13 +166,14 @@ class GTKGStreamerWindow(object):
         self._proxy = WindowServiceProxy(port=59000)
 
         try:
-            self._proxy.create_process(self.movie_view.window_xid)
-            self._proxy.create_pipeline(self.movie_view.window_xid,
-                    self.get_video_device_and_caps_str(), self.output_path,
-                            self.bitrate, draw_queue=draw_queue)
-            self._proxy.set_warp_transform(self.movie_view.window_xid, self.transform_str)
-            self._proxy.start_pipeline(self.movie_view.window_xid)
-            self._proxy.scale(self.movie_view.window_xid, width, height)
+            self._proxy.window_xid(self.movie_view.window_xid)
+            device, caps_str = self.get_video_device_and_caps_str()
+            self._proxy.create(device, caps_str, record_path=self.output_path,
+                    bitrate=self.bitrate, draw_queue=draw_queue, with_warp=True,
+                    with_scale=True)
+            self._proxy.set_warp_transform(self.transform_str)
+            self._proxy.start()
+            self._proxy.scale(width, height)
         except (Exception, ), why:
             print why
             self.stop()
@@ -186,7 +187,8 @@ class GTKGStreamerWindow(object):
         self.button.set_label("Stop")
 
     def stop(self):
-        self._proxy.stop_pipeline(self.movie_view.window_xid)
+        self._proxy.stop()
+        self._proxy.close()
         # Terminate GStreamer service server
         self._proxy = None
         self.button.set_label("Start")
