@@ -5,7 +5,7 @@ import gst
 import gobject
 gobject.threads_init()
 import numpy as np
-from opencv.safe_cv import cv
+from opencv_helpers.safe_cv import cv
 
 
 
