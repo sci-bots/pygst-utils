@@ -1,4 +1,5 @@
 # -*- mode: python -*-
+import zmq
 from path import path
 import gst
 import pygst_utils
@@ -19,6 +20,12 @@ for mod in [gst, pygst_utils, flatland, opencv_helpers, pygtkhelpers]:
     a.datas += [(str(mod_path.parent.relpathto(p)), str(p.abspath()), 'DATA')\
             for p in mod_path.walkfiles(ignore=[r'\.git', r'site_scons',
                     r'.*\.pyc'])]
+
+zmq_dll_path = path(zmq.__file__).parent.joinpath('libzmq.dll')
+if not zmq_dll_path.isfile():
+    raise IOError, 'Cannot find zmq DLL: %s' % zmq_dll_path
+
+a.datas += [(zmq_dll_path.name, str(zmq_dll_path), 'DATA')]
 
 
 pyz = PYZ(a.pure)
