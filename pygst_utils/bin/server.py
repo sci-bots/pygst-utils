@@ -18,6 +18,9 @@ import jsonrpclib.SimpleJSONRPCServer
 import numpy
 import zmq
 import multiprocessing
+import zmq.utils.strtypes
+import zmq.utils.jsonapi
+import zmq.core.pysocket
 # ############################################
 
 
