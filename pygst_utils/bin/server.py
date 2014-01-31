@@ -2,26 +2,9 @@
 import logging
 import sys
 from subprocess import Popen
+import multiprocessing
 
 from path import path
-
-# --- IMPORTS FOR DISCOVERY BY PYINSTALLER ---
-import platform
-import blinker
-import decimal
-import pygtk
-import gtk
-import gst
-import cgi
-import jsonrpclib
-import jsonrpclib.SimpleJSONRPCServer
-import numpy
-import zmq
-import multiprocessing
-import zmq.utils.strtypes
-import zmq.utils.jsonapi
-import zmq.core.pysocket
-# ############################################
 
 
 def base_path():
@@ -40,7 +23,6 @@ def base_path():
 package_root = base_path().parent.parent
 sys.path.insert(0, package_root)
 
-import pygst_utils
 from pygst_utils.video_pipeline.window_process import WindowProcess
 
 
