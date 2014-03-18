@@ -6,7 +6,7 @@ import re
 from xml.dom.minidom import Document
 
 import jinja2
-from path import path
+from path_helpers import path
 
 
 WXS_TEMPLATE = '''\

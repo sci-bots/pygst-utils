@@ -4,7 +4,7 @@ try:
 except ImportError:
     import pickle
 
-from path import path
+from path_helpers import path
 import gst
 import gobject
 gobject.threads_init()

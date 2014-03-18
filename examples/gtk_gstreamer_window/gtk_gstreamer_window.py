@@ -29,7 +29,7 @@ import jsonrpclib.SimpleJSONRPCServer
 from jsonrpclib import Server
 import blinker
 import decimal
-from path import path
+from path_helpers import path
 
 
 import pygst_utils

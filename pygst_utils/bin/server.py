@@ -3,7 +3,7 @@ import logging
 import sys
 from subprocess import Popen
 
-from path import path
+from path_helpers import path
 
 
 def base_path():

@@ -6,7 +6,7 @@ from pprint import pprint
 from multiprocessing import Process, Pipe
 import traceback
 
-from path import path
+from path_helpers import path
 try:
     import pygst
     pygst.require("0.10")
