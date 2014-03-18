@@ -34,7 +34,7 @@ class DeferredCommand(object):
     def __call__(self, *args, **kwargs):
         command_args = kwargs.copy()
         command_args.update({'command': self.command, 'args': args or [],
-                'kwargs': kwargs or {}})
+                             'kwargs': kwargs or {}})
         self.sock.send_zipped_pickle(command_args)
         return self.sock.recv_zipped_pickle()
 

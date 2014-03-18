@@ -75,10 +75,10 @@ class WindowProcess(Process):
         command_attr = '_command___%s' % request.get('command', None)
         if hasattr(self, command_attr):
             return getattr(self, command_attr)(*request.get('args', []),
-                    **request.get('kwargs', {}))
+                                               **request.get('kwargs', {}))
         else:
             logging.warning('Invalid command: %s' % request.get('command',
-                    None))
+                                                                None))
             return None
 
     ### command-processing methods ####################################################
@@ -94,8 +94,26 @@ class WindowProcess(Process):
         return self.pm.window_xid
 
     def _command___start(self):
-        response = self.pm.pipeline.set_state(gst.STATE_PLAYING)
-        return response
+        # Cast GStreamer state-change return value _(i.e.,
+        # `GstStateChangeReturn`)_ enumerated type as integer.  Otherwise,
+        # there can be issues when calling through a proxy.
+        #
+        # For example, when running the [MicroDrop][1] application by calling
+        # `python -m microdrop.microdrop` from outside of the source directory,
+        # the following error occurs when calling one of the remote API
+        # commands:
+        #
+        #     Traceback (most recent call last):
+        #       File ".../microdrop/gui/dmf_device_view.py", line 266, in destroy_video_proxy
+        #         self._proxy.stop()
+        #       File ".../pygst-utils/pygst_utils/video_pipeline/window_service_proxy.py", line 40, in __call__
+        #         return self.sock.recv_zipped_pickle()
+        #       File ".../pygst-utils/pygst_utils/video_pipeline/serialsocket.py", line 31, in recv_zipped_pickle
+        #         return pickle.loads(pobj)
+        #     AttributeError: 'NoneType' object has no attribute 'StateChangeReturn'
+        #
+        # [1]: http://microfluidics.utoronto.ca/microdrop
+        return int(self.pm.pipeline.set_state(gst.STATE_PLAYING))
 
     def _command___pipeline_available(self):
         return not (self.pm.pipeline is None)
@@ -104,8 +122,11 @@ class WindowProcess(Process):
         return os.getpid()
 
     def _command___get_state(self):
-        response = self.pm.pipeline.get_state(gst.STATE_NULL)
-        return response
+        # Cast GStreamer state-change return value _(i.e.,
+        # `GstStateChangeReturn`)_ enumerated type as integer.  Otherwise,
+        # there can be issues when calling through a proxy.
+        # See `_command___start` for more details
+        return int(self.pm.pipeline.get_state(gst.STATE_NULL))
 
     def _command___get_video_mode_enum(self):
         from ..video_mode import get_video_mode_enum
@@ -144,7 +165,11 @@ class WindowProcess(Process):
 
     def _command___stop(self):
         response = self.pm.pipeline.set_state(gst.STATE_NULL)
-        return response
+        # Cast GStreamer state-change return value _(i.e.,
+        # `GstStateChangeReturn`)_ enumerated type as integer.  Otherwise,
+        # there can be issues when calling through a proxy.
+        # See `_command___start` for more details
+        return int(response)
 
     def _command___request_frame(self):
         frame_grabber = self.pm.pipeline.get_by_name('grab_frame')
@@ -184,15 +209,15 @@ class WindowProcess(Process):
     def _command___get_frame(self):
         return self.last_frame
 
-    def _command___create(self, device, caps_str, record_path=None, bitrate=None,
-            draw_queue=None, with_scale=False, with_warp=False,
-                    with_frame_grab=True):
+    def _command___create(self, device, caps_str, record_path=None,
+                          bitrate=None, draw_queue=None, with_scale=False,
+                          with_warp=False, with_frame_grab=True):
         from ..video_mode import create_video_source
 
         def init_pipeline(pm, device, caps_str, bitrate, record_path,
-                draw_queue, with_scale, with_warp, with_frame_grab):
-            values = [device, caps_str, bitrate, record_path,
-                    draw_queue, with_scale, with_warp, with_frame_grab]
+                          draw_queue, with_scale, with_warp, with_frame_grab):
+            values = [device, caps_str, bitrate, record_path, draw_queue,
+                      with_scale, with_warp, with_frame_grab]
             print 'init_pipeline args={}'.format(values)
             video_source = create_video_source(device, caps_str)
             if with_frame_grab:
@@ -200,12 +225,20 @@ class WindowProcess(Process):
             else:
                 on_frame_grabbed = None
             pipeline = get_pipeline(video_source, bitrate, record_path,
-                    draw_queue, with_scale=with_scale, with_warp=with_warp,
-                    on_frame_grabbed=on_frame_grabbed)
+                                    draw_queue, with_scale=with_scale,
+                                    with_warp=with_warp,
+                                    on_frame_grabbed=on_frame_grabbed)
             pm.pipeline = pipeline
             return pm.pipeline.set_state(gst.STATE_READY)
-        return init_pipeline(self.pm, device, caps_str, bitrate, record_path,
-                draw_queue, with_scale, with_warp, with_frame_grab)
+
+        response = init_pipeline(self.pm, device, caps_str, bitrate,
+                                 record_path, draw_queue, with_scale,
+                                 with_warp, with_frame_grab)
+        # Cast GStreamer state-change return value _(i.e.,
+        # `GstStateChangeReturn`)_ enumerated type as integer.  Otherwise,
+        # there can be issues when calling through a proxy.
+        # See `_command___start` for more details
+        return int(response)
 
     ### utility methods ####################################################
 
