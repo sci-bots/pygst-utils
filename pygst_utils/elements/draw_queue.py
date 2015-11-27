@@ -44,9 +44,9 @@ class DrawQueue(object):
     # the specified arguments) will be recorded to be played back using the
     # render() method.
     cairo_methods = ['restore', 'save', 'scale', 'move_to', 'set_line_width',
-            'line_to', 'close_path',
-            'rectangle', 'set_source_rgb', 'stroke_preserve', 'set_source_rgba',
-                    'fill', 'translate', 'stroke', 'fill_preserve']
+                     'line_to', 'close_path', 'rectangle', 'set_source_rgb',
+                     'stroke_preserve', 'set_source_rgba', 'fill', 'translate',
+                     'stroke', 'fill_preserve', 'clip', 'clip_preserve']
 
     def __init__(self, render_callables=None):
         self.render_callables = render_callables or deque()
