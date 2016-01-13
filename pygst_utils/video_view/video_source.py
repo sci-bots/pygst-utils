@@ -1,16 +1,12 @@
-import sys
+from datetime import datetime
 import logging
+import os
+import sys
 
+from zmq.eventloop import ioloop
 import zmq
 
 logger = logging.getLogger(__name__)
-
-from datetime import datetime
-import os, logging
-
-
-log = logging.getLogger( __name__ )
-HERE = os.path.dirname( __file__ )
 
 
 def main(pipeline_command, transport, host, port=None):
@@ -63,6 +59,8 @@ def parse_args(args=None):
 
     parser = ArgumentParser(description='GStreamer to ZeroMQ socket.')
     log_levels = ('critical', 'error', 'warning', 'info', 'debug', 'notset')
+    parser.add_argument('-i', '--interactive', action='store_true', help='Do '
+                        'not start main loop.')
     parser.add_argument('-l', '--log-level', type=str, choices=log_levels,
                         default='info')
     parser.add_argument('transport')
@@ -96,10 +94,7 @@ if __name__ == "__main__":
     pipeline, status = main(args.pipeline, args.transport, args.host,
                             args.port)
 
-    #while 'buf' not in status:
-        #time.sleep(.1)
-    #pipeline.set_state(gst.STATE_PAUSED)
-
-    #buf = status['buf']
-    #np_transform = np.identity(3, dtype='float32')
-    #cv_transform = cv.fromarray(np_transform)
+    if not args.interactive:
+        ioloop.install()
+        logger.info('Starting run loop.')
+        ioloop.IOLoop.instance().start()

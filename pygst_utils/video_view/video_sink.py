@@ -1,21 +1,98 @@
+from subprocess import Popen
 from datetime import datetime
 import logging
+import json
 import sys
 
 from dmf_device_ui.options import DebugView
 from pygtkhelpers.delegates import SlaveView
 from pygtkhelpers.ui.views.cairo_view import GtkCairoView
-from pygtkhelpers.utils import gsignal
+from pygtkhelpers.utils import gsignal, refresh_gui
 import cairo
 import cv2
 import gobject
 import gtk
 import numpy as np
+import pandas as pd
 import zmq
 
+from ..video_source import get_available_video_modes, GstVideoSourceManager
 from . import np_to_cairo
 
 logger = logging.getLogger(__name__)
+
+
+class VideoModeSelector(SlaveView):
+    gsignal('video-config-selected', object)
+
+    def __init__(self, configs=None):
+        if configs is None:
+            self.configs = pd.DataFrame(get_available_video_modes())
+        else:
+            self.configs = configs
+        super(VideoModeSelector, self).__init__()
+
+    def set_configs(self, configs):
+        f_config_str = (lambda c: '[{device}] {width}x{height}\t'
+                        '{framerate:.0f}fps'.format(**c))
+
+        self.config_store.clear()
+        self.config_store.append([-1, None, 'None'])
+        for i, config_i in configs.iterrows():
+            self.config_store.append([i, config_i, f_config_str(config_i)])
+
+    def create_ui(self):
+        self.config_store = gtk.ListStore(int, object, str)
+        self.set_configs(self.configs)
+
+        self.config_combo = gtk.ComboBox(model=self.config_store)
+        renderer_text = gtk.CellRendererText()
+        self.config_combo.pack_start(renderer_text, True)
+        self.config_combo.add_attribute(renderer_text, "text", 2)
+        self.config_combo.connect("changed", self.on_config_combo_changed)
+        self.widget.pack_start(self.config_combo, False, False, 0)
+
+    def on_config_combo_changed(self, combo):
+        tree_iter = combo.get_active_iter()
+        if tree_iter is not None:
+            model = combo.get_model()
+            config = model[tree_iter][1]
+            self.emit('video-config-selected', config)
+
+
+class Transform(SlaveView):
+    gsignal('transform-changed', object)
+
+    def __init__(self, transform=None):
+        self.transform = (np.eye(3, dtype=float) if transform is None
+                          else transform)
+        super(Transform, self).__init__()
+
+    def create_ui(self):
+        super(Transform, self).create_ui()
+        self.widget.set_orientation(gtk.ORIENTATION_HORIZONTAL)
+        self.label_tag_transform = gtk.Label('Transform: ')
+        self.entry_transform = gtk.Entry()
+        self.button_select = gtk.Button('Select')
+
+        # Trigger update of transform text entry.
+        self.set_transform(self.transform)
+
+        for widget in (self.label_tag_transform, self.entry_transform,
+                       self.button_select):
+            self.widget.pack_start(widget, False, False, 0)
+
+    def on_button_select__clicked(self, button):
+        logger.info('[Transform] button click')
+        transform_list = json.loads(self.entry_transform.get_text())
+        self.set_transform(np.array(transform_list, dtype=float))
+
+    def set_transform(self, transform):
+        self.transform = transform
+        transform_str = json.dumps(self.transform.tolist())
+        self.entry_transform.set_text(transform_str)
+        self.entry_transform.set_width_chars(len(transform_str))
+        self.emit('transform-changed', self.transform)
 
 
 class VideoInfo(SlaveView):
@@ -24,15 +101,15 @@ class VideoInfo(SlaveView):
         self.widget.set_orientation(gtk.ORIENTATION_HORIZONTAL)
         self.label_tag_fps = gtk.Label('Frames per second:')
         self.label_fps = gtk.Label()
-        self.label_tag_dropped_frames = gtk.Label('  Dropped frames:')
-        self.label_dropped_frames = gtk.Label()
+        self.label_tag_dropped_rate = gtk.Label('  Dropped frames/s:')
+        self.label_dropped_rate = gtk.Label()
         self.widget.pack_start(self.label_tag_fps, False, False)
         self.widget.pack_start(self.label_fps, False, False)
-        self.widget.pack_start(self.label_tag_dropped_frames, False, False)
-        self.widget.pack_start(self.label_dropped_frames, False, False)
+        self.widget.pack_start(self.label_tag_dropped_rate, False, False)
+        self.widget.pack_start(self.label_dropped_rate, False, False)
 
         self.frames_per_second = 0
-        self.dropped_frames = 0
+        self.dropped_rate = 0
 
     @property
     def frames_per_second(self):
@@ -43,17 +120,18 @@ class VideoInfo(SlaveView):
         self.label_fps.set_text('%.1f' % float(value))
 
     @property
-    def dropped_frames(self):
-        return int(self.label_dropped_frames.get_text())
+    def dropped_rate(self):
+        return float(self.label_dropped_rate.get_text())
 
-    @dropped_frames.setter
-    def dropped_frames(self, value):
-        self.label_dropped_frames.set_text('%d' % int(value))
+    @dropped_rate.setter
+    def dropped_rate(self, value):
+        self.label_dropped_rate.set_text('%.1f' % float(value))
 
 
 class VideoSink(SlaveView):
-    gsignal('frame-rate-update', float, int)
+    gsignal('frame-rate-update', float, float)
     gsignal('frame-update', object)
+    gsignal('transform-changed', object)
 
     def __init__(self, transport, target_host, port=None):
         self.status = {}
@@ -73,6 +151,8 @@ class VideoSink(SlaveView):
     @transform.setter
     def transform(self, value):
         self._transform = value
+        self.frame_shape = None
+        self.emit('transform-changed', value)
 
     @property
     def shape(self):
@@ -107,7 +187,7 @@ class VideoSink(SlaveView):
         status = {'frame_count': 0, 'dropped_count': 0, 'start_time':
                   datetime.now()}
         self.status = status
-        self.video_timeout_id = gtk.timeout_add(20, self.check_sockets, status)
+        self.video_timeout_id = gtk.timeout_add(50, self.check_sockets, status)
 
     def check_sockets(self, status):
         buf_str = None
@@ -130,11 +210,11 @@ class VideoSink(SlaveView):
 
         if status['duration'] > 2:
             status['fps'] = status['frame_count'] / status['duration']
-            print '\r%5.1f frames/second (%2d dropped)' % (status['fps'],
-                                                           status
-                                                           ['dropped_count']),
+            #print '\r%5.1f frames/second (%2d dropped)' % (status['fps'],
+                                                           #status
+                                                           #['dropped_count']),
             self.emit('frame-rate-update', status['fps'],
-                      status['dropped_count'])
+                      status['dropped_count'] / status['duration'])
             status['frame_count'] = 0
             status['dropped_count'] = 0
             status['start_time'] = datetime.now()
@@ -166,14 +246,15 @@ class VideoSink(SlaveView):
                 # No target shape has been set.  Use frame size.
                 self.scaled_transform = self.transform
                 self.shape = self.frame_shape
-                print self.scaled_transform
+                logger.debug('unit transform: %s', self.scaled_transform)
             else:
                 # Update transform to scale to target shape.
                 self.scaled_transform = self.transform.copy()
                 scale = np.array(self.shape, dtype=float) / self.frame_shape
                 for i in xrange(2):
-                    self.scaled_transform[i, i] *= scale[i]
-                print self.scaled_transform
+                    self.scaled_transform[:2, i] *= scale[i]
+                logger.debug('scaled transform: %s -> %s', self.transform,
+                             self.scaled_transform)
         np_warped = cv2.warpPerspective(np_bgr, self.scaled_transform,
                                         self.shape)
         self.emit('frame-update', np_warped)
@@ -184,25 +265,53 @@ class VideoView(GtkCairoView):
         self.socket_info = {'transport': transport,
                             'host': target_host,
                             'port': port}
+        self.callback_id = None
+        self._enabled = False
         super(VideoView, self).__init__()
 
     def on_widget__configure_event(self, widget, event):
+        '''
+        Handle resize of Cairo drawing area.
+        '''
+        # Set new target size for scaled frames from video sink.
         self.video_sink.shape = event.width, event.height
+        if not self._enabled:
+            gtk.idle_add(self.on_frame_update, None, None)
 
     def create_ui(self):
         self.video_sink = VideoSink(*[self.socket_info[k]
                                       for k in ['transport', 'host', 'port']])
         self.video_sink.reset()
-        self.video_sink.connect('frame-update', self.on_frame_update)
         self.surfaces = self.get_surfaces()
         super(VideoView, self).create_ui()
+
+    def enable(self):
+        if self.callback_id is None:
+            self.callback_id = self.video_sink.connect('frame-update',
+                                                       self.on_frame_update)
+            self._enabled = True
+
+    def disable(self):
+        if self.callback_id is not None:
+            self.video_sink.disconnect(self.callback_id)
+            self.callback_id = None
+            self._enabled = False
+        gtk.idle_add(self.on_frame_update, None, None)
 
     def on_frame_update(self, slave, np_frame):
         if self.widget.window is None:
             return
-        cr_warped, np_warped_view = np_to_cairo(np_frame)
+        if np_frame is None:
+            cr_warped = cairo.ImageSurface(cairo.FORMAT_RGB24,
+                                           *self.video_sink.shape)
+        else:
+            cr_warped, np_warped_view = np_to_cairo(np_frame)
+            if not self._enabled:
+                logging.error('got frame when not enabled')
+        refresh_gui(0, 0)
 
         combined_surface = self.composite_surface([cr_warped] + self.surfaces)
+        refresh_gui(0, 0)
         self.draw_surface(combined_surface)
 
     def draw_to_widget_surface(self, surface):
@@ -267,17 +376,32 @@ class View(SlaveView):
         self.socket_info = {'transport': transport,
                             'host': target_host,
                             'port': port}
+        self.video_source_process = None
         super(View, self).__init__()
+
+    def cleanup(self):
+        if self.video_source_process is not None:
+            self.video_source_process.terminate()
+            logger.info('terminate video process')
+
+    def __del__(self):
+        self.cleanup()
+
+    def on_widget__destroy(self, widget):
+        self.cleanup()
 
     def create_ui(self):
         super(View, self).create_ui()
         self.debug_slave = self.add_slave(DebugView(), 'widget')
+        self.video_mode_slave = self.add_slave(VideoModeSelector(), 'widget')
         self.info_slave = self.add_slave(VideoInfo(), 'widget')
+        self.transform_slave = self.add_slave(Transform(), 'widget')
         video_view = VideoView(*[self.socket_info[k]
                                  for k in ['transport', 'host', 'port']])
         self.video_slave = self.add_slave(video_view, 'widget')
 
-        for widget in (self.debug_slave.widget, self.info_slave.widget):
+        for widget in (self.debug_slave.widget, self.video_mode_slave.widget,
+                       self.transform_slave.widget, self.info_slave.widget):
             self.widget.set_child_packing(widget, False, False, 0,
                                           gtk.PACK_START)
 
@@ -286,9 +410,39 @@ class View(SlaveView):
         self.video_slave.video_sink.connect('frame-rate-update',
                                             self.on_frame_rate_update)
 
-    def on_frame_rate_update(self, slave, frame_rate, dropped_frames):
+    def on_transform_slave__transform_changed(self, slave, transform):
+        self.video_slave.video_sink.transform = transform
+        logger.info('[View] transform changed from GUI: %s', transform.tolist())
+
+    def on_video_mode_slave__video_config_selected(self, slave, video_config):
+        if video_config is None:
+            self.cleanup()
+            self.video_slave.disable()
+            return
+        caps_str = ('video/x-raw-rgb,width={width:d},height={height:d},'
+                    'format=RGB,'
+                    'framerate={framerate_num:d}/{framerate_denom:d}'
+                    .format(**video_config))
+        logging.info('[View] video config caps string: %s', caps_str)
+        py_exe = sys.executable
+        port = self.video_slave.video_sink.socket_info['port']
+        transport = self.video_slave.video_sink.socket_info['transport']
+        host = self.video_slave.video_sink.socket_info['host'].replace('*',
+                                                                       'localhost')
+        # Terminate existing process (if running).
+        self.cleanup()
+        command = [py_exe, '-m', 'pygst_utils.video_view.video_source', '-p',
+                   str(port), transport, host,
+                   'autovideosrc ! ffmpegcolorspace ! ' + caps_str +
+                   ' ! videorate ! appsink name=app-video emit-signals=true']
+        logger.info(' '.join(command))
+        self.video_source_process = Popen(command)
+        self.video_source_process.daemon = True
+        self.video_slave.enable()
+
+    def on_frame_rate_update(self, slave, frame_rate, dropped_rate):
         self.info_slave.frames_per_second = frame_rate
-        self.info_slave.dropped_frames += dropped_frames
+        self.info_slave.dropped_rate = dropped_rate
 
 
 def parse_args(args=None):
@@ -304,7 +458,7 @@ def parse_args(args=None):
                         default='info')
     parser.add_argument('transport')
     parser.add_argument('host')
-    parser.add_argument('-p', '--port', default=None)
+    parser.add_argument('-p', '--port', default=None, type=int)
 
     args = parser.parse_args()
     args.log_level = getattr(logging, args.log_level.upper())
