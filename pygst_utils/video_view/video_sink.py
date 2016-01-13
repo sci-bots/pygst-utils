@@ -238,6 +238,7 @@ class VideoSink(SlaveView):
 
 
 class VideoView(GtkCairoView):
+    gsignal('point-pair-selected', object)
     gsignal('video-enabled')
     gsignal('video-disabled')
 
@@ -309,6 +310,35 @@ class VideoView(GtkCairoView):
         self.video_sink.reset()
         self.surfaces = self.get_surfaces()
         super(VideoView, self).create_ui()
+        self.widget.set_events(gtk.gdk.BUTTON_PRESS |
+                               gtk.gdk.BUTTON_RELEASE |
+                               gtk.gdk.BUTTON_MOTION_MASK |
+                               gtk.gdk.BUTTON_PRESS_MASK |
+                               gtk.gdk.BUTTON_RELEASE_MASK |
+                               gtk.gdk.POINTER_MOTION_MASK)
+
+    ###########################################################################
+    # ## Mouse event handling ##
+    def on_video_sink__frame_shape_changed(self, slave, shape):
+        # Video frame is a new shape.
+        self.reset_frame_corners()
+        self.update_transforms()
+
+    def on_widget__button_press_event(self, widget, event):
+        '''
+        Called when any mouse button is pressed.
+        '''
+        if event.button == 1:
+            self.start_event = event.copy()
+
+    def on_widget__button_release_event(self, widget, event):
+        '''
+        Called when any mouse button is released.
+        '''
+        if event.button == 1 and self.start_event is not None:
+            self.emit('point-pair-selected', {'start_event': self.start_event,
+                                              'end_event': event.copy()})
+            self.start_event = None
 
     def enable(self):
         if self.callback_id is None:
@@ -469,6 +499,30 @@ class View(SlaveView):
     def on_frame_rate_update(self, slave, frame_rate, dropped_rate):
         self.info_slave.frames_per_second = frame_rate
         self.info_slave.dropped_rate = dropped_rate
+
+    def on_video_slave__point_pair_selected(self, slave, data):
+        start_xy = [getattr(data['start_event'], k) for k in 'xy']
+        end_xy = [getattr(data['end_event'], k) for k in 'xy']
+        logger.debug('[View] point pair selected: %s, %s', start_xy, end_xy)
+
+        slave = self.video_slave
+        # Map GTK event x/y coordinates to the video frame coordinate space.
+        frame_point_i = \
+            cv2.perspectiveTransform(np.array([[start_xy]], dtype=float),
+                                     slave.canvas_to_frame_map).ravel()
+        # Find the closest corner point in the frame to the starting point.
+        frame_corner_i = find_closest(slave.df_frame_corners, frame_point_i)
+        # Find the closest corner point in the canvas to the end point.
+        canvas_corner_i = find_closest(slave.df_canvas_corners, end_xy)
+        # Replace the corresponding corner point coordinates with the
+        # respective new points.
+        slave.df_frame_corners.iloc[frame_corner_i.name] = frame_point_i
+        slave.df_canvas_corners.iloc[canvas_corner_i.name] = end_xy
+        slave.update_transforms()
+
+
+def find_closest(df_points, point):
+    return df_points.iloc[((df_points - point) ** 2).sum(axis=1).argmin()]
 
 
 def parse_args(args=None):
