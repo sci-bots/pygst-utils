@@ -149,7 +149,6 @@ class VideoSink(SlaveView):
     @transform.setter
     def transform(self, value):
         self._transform = value
-        self.frame_shape = None
         self.emit('transform-changed', value)
 
     def reset(self):
