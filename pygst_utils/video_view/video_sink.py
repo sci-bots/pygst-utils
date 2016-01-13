@@ -61,7 +61,9 @@ class VideoModeSelector(SlaveView):
 
 
 class Transform(SlaveView):
-    gsignal('transform-changed', object)
+    gsignal('transform-reset')
+    gsignal('transform-rotate-left')
+    gsignal('transform-rotate-right')
 
     def __init__(self, transform=None):
         self.transform = (np.eye(3, dtype=float) if transform is None
@@ -72,27 +74,22 @@ class Transform(SlaveView):
         super(Transform, self).create_ui()
         self.widget.set_orientation(gtk.ORIENTATION_HORIZONTAL)
         self.label_tag_transform = gtk.Label('Transform: ')
-        self.entry_transform = gtk.Entry()
-        self.button_select = gtk.Button('Select')
+        self.button_rotate_left = gtk.Button('Rotate left')
+        self.button_rotate_right = gtk.Button('Rotate right')
+        self.button_reset = gtk.Button('Reset')
 
-        # Trigger update of transform text entry.
-        self.set_transform(self.transform)
-
-        for widget in (self.label_tag_transform, self.entry_transform,
-                       self.button_select):
+        for widget in (self.label_tag_transform, self.button_rotate_left,
+                       self.button_rotate_right, self.button_reset):
             self.widget.pack_start(widget, False, False, 0)
 
-    def on_button_select__clicked(self, button):
-        logger.info('[Transform] button click')
-        transform_list = json.loads(self.entry_transform.get_text())
-        self.set_transform(np.array(transform_list, dtype=float))
+    def on_button_reset__clicked(self, button):
+        self.emit('transform-reset')
 
-    def set_transform(self, transform):
-        self.transform = transform
-        transform_str = json.dumps(self.transform.tolist())
-        self.entry_transform.set_text(transform_str)
-        self.entry_transform.set_width_chars(len(transform_str))
-        self.emit('transform-changed', self.transform)
+    def on_button_rotate_left__clicked(self, button):
+        self.emit('transform-rotate-left')
+
+    def on_button_rotate_right__clicked(self, button):
+        self.emit('transform-rotate-right')
 
 
 class VideoInfo(SlaveView):
@@ -466,9 +463,23 @@ class View(SlaveView):
         self.video_slave.video_sink.connect('frame-rate-update',
                                             self.on_frame_rate_update)
 
-    def on_transform_slave__transform_changed(self, slave, transform):
-        self.video_slave.video_sink.transform = transform
-        logger.info('[View] transform changed from GUI: %s', transform.tolist())
+    def on_transform_slave__transform_reset(self, slave):
+        logger.info('[View] reset transform')
+        self.video_slave.reset_canvas_corners()
+        self.video_slave.reset_frame_corners()
+        self.video_slave.update_transforms()
+
+    def on_transform_slave__transform_rotate_left(self, slave):
+        self.video_slave.df_canvas_corners[:] = np.roll(self.video_slave
+                                                        .df_canvas_corners.values,
+                                                        1, axis=0)
+        self.video_slave.update_transforms()
+
+    def on_transform_slave__transform_rotate_right(self, slave):
+        self.video_slave.df_canvas_corners[:] = np.roll(self.video_slave
+                                                        .df_canvas_corners.values,
+                                                        -1, axis=0)
+        self.video_slave.update_transforms()
 
     def on_video_mode_slave__video_config_selected(self, slave, video_config):
         if video_config is None:
