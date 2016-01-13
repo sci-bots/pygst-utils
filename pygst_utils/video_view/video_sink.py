@@ -238,6 +238,9 @@ class VideoSink(SlaveView):
 
 
 class VideoView(GtkCairoView):
+    gsignal('video-enabled')
+    gsignal('video-disabled')
+
     def __init__(self, transport, target_host, port=None):
         self.socket_info = {'transport': transport,
                             'host': target_host,
@@ -312,12 +315,14 @@ class VideoView(GtkCairoView):
             self.callback_id = self.video_sink.connect('frame-update',
                                                        self.on_frame_update)
             self._enabled = True
+            self.emit('video-enabled')
 
     def disable(self):
         if self.callback_id is not None:
             self.video_sink.disconnect(self.callback_id)
             self.callback_id = None
             self._enabled = False
+            self.emit('video-disabled')
         gtk.idle_add(self.on_frame_update, None, None)
 
     def on_frame_update(self, slave, np_frame):
