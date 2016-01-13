@@ -64,6 +64,7 @@ class Transform(SlaveView):
     gsignal('transform-reset')
     gsignal('transform-rotate-left')
     gsignal('transform-rotate-right')
+    gsignal('transform-modify-toggled', bool)
 
     def __init__(self, transform=None):
         self.transform = (np.eye(3, dtype=float) if transform is None
@@ -77,9 +78,11 @@ class Transform(SlaveView):
         self.button_rotate_left = gtk.Button('Rotate left')
         self.button_rotate_right = gtk.Button('Rotate right')
         self.button_reset = gtk.Button('Reset')
+        self.button_modify = gtk.CheckButton('Modify')
 
         for widget in (self.label_tag_transform, self.button_rotate_left,
-                       self.button_rotate_right, self.button_reset):
+                       self.button_rotate_right, self.button_reset,
+                       self.button_modify):
             self.widget.pack_start(widget, False, False, 0)
 
     def on_button_reset__clicked(self, button):
@@ -90,6 +93,13 @@ class Transform(SlaveView):
 
     def on_button_rotate_right__clicked(self, button):
         self.emit('transform-rotate-right')
+
+    def on_button_modify__toggled(self, button):
+        self.emit('transform-modify-toggled', self.modify)
+
+    @property
+    def modify(self):
+        return self.button_modify.get_active()
 
 
 class VideoInfo(SlaveView):
@@ -336,6 +346,10 @@ class VideoView(GtkCairoView):
                                               'end_event': event.copy()})
             self.start_event = None
 
+    @property
+    def enabled(self):
+        return self._enabled
+
     def enable(self):
         if self.callback_id is None:
             self.callback_id = self.video_sink.connect('frame-update',
@@ -512,6 +526,8 @@ class View(SlaveView):
         self.info_slave.dropped_rate = dropped_rate
 
     def on_video_slave__point_pair_selected(self, slave, data):
+        if not self.transform_slave.modify or not self.video_slave.enabled:
+            return
         start_xy = [getattr(data['start_event'], k) for k in 'xy']
         end_xy = [getattr(data['end_event'], k) for k in 'xy']
         logger.debug('[View] point pair selected: %s, %s', start_xy, end_xy)
