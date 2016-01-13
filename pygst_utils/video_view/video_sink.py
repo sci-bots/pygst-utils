@@ -433,7 +433,7 @@ class VideoView(GtkCairoView):
         cairo_context = self.widget.window.cairo_create()
         cairo_context.set_operator(operator)
         cairo_context.set_source_surface(surface)
-        cairo_context.rectangle(x, y, width, height)
+        cairo_context.rectangle(0, 0, width, height)
         cairo_context.fill()
 
 
