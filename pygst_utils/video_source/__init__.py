@@ -1,9 +1,9 @@
 from __future__ import division
 from collections import namedtuple
+from multiprocessing import Process, Pipe
+from pprint import pprint
 import logging
 import platform
-from pprint import pprint
-from multiprocessing import Process, Pipe
 import traceback
 
 from path_helpers import path
@@ -14,6 +14,7 @@ except:
     pass
 finally:
     import gst
+import pandas as pd
 
 
 Fps = namedtuple('Fps', 'num denom')
@@ -37,7 +38,14 @@ def get_available_video_modes(**kwargs):
             video_modes.append(c)
     if not video_modes:
         raise DeviceNotFound, 'No video modes available.'
-    return video_modes
+    df_video_modes = pd.DataFrame(video_modes)
+    df_video_modes['framerate_num'] = (df_video_modes.framerate
+                                       .map(lambda v: v[0]))
+    df_video_modes['framerate_denom'] = (df_video_modes.framerate
+                                         .map(lambda v: v[1]))
+    df_video_modes['framerate'] = (df_video_modes['framerate_num'] /
+                                   df_video_modes['framerate_denom'])
+    return df_video_modes
 
 
 def get_video_source_configs():
@@ -89,7 +97,7 @@ class GstVideoSourceManager(object):
     @staticmethod
     def get_caps_string(extracted_cap):
         return '{name:s},width={width:d},height={height:d},fourcc={fourcc:s},'\
-                'framerate={framerate.num:d}/{framerate.denom:d}'.format(**extracted_cap)
+                'framerate={framerate_num:d}/{framerate_denom:d}'.format(**extracted_cap)
 
     def _query_device_extracted_caps(self, pipe_conn, dimensions=None,
             framerate=None, format_=None, name=None):
