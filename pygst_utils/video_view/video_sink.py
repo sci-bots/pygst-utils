@@ -449,6 +449,7 @@ class View(SlaveView):
         self.video_mode_slave = self.add_slave(VideoModeSelector(), 'widget')
         self.info_slave = self.add_slave(VideoInfo(), 'widget')
         self.transform_slave = self.add_slave(Transform(), 'widget')
+        self.transform_slave.widget.set_sensitive(False)
         video_view = VideoView(*[self.socket_info[k]
                                  for k in ['transport', 'host', 'port']])
         self.video_slave = self.add_slave(video_view, 'widget')
@@ -531,6 +532,11 @@ class View(SlaveView):
         slave.df_canvas_corners.iloc[canvas_corner_i.name] = end_xy
         slave.update_transforms()
 
+    def on_video_slave__video_disabled(self, slave):
+        self.transform_slave.widget.set_sensitive(False)
+
+    def on_video_slave__video_enabled(self, slave):
+        self.transform_slave.widget.set_sensitive(True)
 
 def find_closest(df_points, point):
     return df_points.iloc[((df_points - point) ** 2).sum(axis=1).argmin()]
