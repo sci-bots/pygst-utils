@@ -6,11 +6,12 @@ try:
 except ImportError:
     import pickle
 
-from __init__ import get_pipeline
-from pipeline_manager import PipelineManager
 import gst
 import gtk
 gtk.threads_init()
+
+from __init__ import get_pipeline
+from pipeline_manager import PipelineManager
 
 from ..video_source import DeviceNotFound
 
