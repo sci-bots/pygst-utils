@@ -131,6 +131,7 @@ class VideoInfo(SlaveView):
 class VideoSink(SlaveView):
     gsignal('frame-rate-update', float, float)
     gsignal('frame-update', object)
+    gsignal('frame-shape-changed', object)
     gsignal('transform-changed', object)
 
     def __init__(self, transport, target_host, port=None):
@@ -140,9 +141,9 @@ class VideoSink(SlaveView):
                             'port': port,
                             'transport': transport}
         self.video_timeout_id = None
-        self._transform = np.identity(3, dtype='float32')
-        self._shape = None
         self.frame_shape = None
+        self._transform = np.identity(3, dtype='float32')
+        self.shape = None
 
     @property
     def transform(self):
@@ -153,19 +154,6 @@ class VideoSink(SlaveView):
         self._transform = value
         self.frame_shape = None
         self.emit('transform-changed', value)
-
-    @property
-    def shape(self):
-        if self._shape is not None:
-            return self._shape
-        elif 'np_warped_view' in self.status:
-            return self.status['np_warped_view'].shape[:2]
-
-    @shape.setter
-    def shape(self, value):
-        logging.info('[VideoSink] shape=%s', value)
-        self._shape = value
-        self.frame_shape = None
 
     def reset(self):
         if self.video_timeout_id is not None:
@@ -242,21 +230,10 @@ class VideoSink(SlaveView):
         if self.frame_shape != (width, height):
             # Frame shape has changed.
             self.frame_shape = width, height
+            self.emit('frame-shape-changed', self.frame_shape)
             if self.shape is None:
-                # No target shape has been set.  Use frame size.
-                self.scaled_transform = self.transform
-                self.shape = self.frame_shape
-                logger.debug('unit transform: %s', self.scaled_transform)
-            else:
-                # Update transform to scale to target shape.
-                self.scaled_transform = self.transform.copy()
-                scale = np.array(self.shape, dtype=float) / self.frame_shape
-                for i in xrange(2):
-                    self.scaled_transform[:2, i] *= scale[i]
-                logger.debug('scaled transform: %s -> %s', self.transform,
-                             self.scaled_transform)
-        np_warped = cv2.warpPerspective(np_bgr, self.scaled_transform,
-                                        self.shape)
+                self.shape = width, height
+        np_warped = cv2.warpPerspective(np_bgr, self.transform, self.shape)
         self.emit('frame-update', np_warped)
 
 
@@ -267,16 +244,61 @@ class VideoView(GtkCairoView):
                             'port': port}
         self.callback_id = None
         self._enabled = False
+        self.start_event = None
+        self.df_canvas_corners = pd.DataFrame(None, columns=['x', 'y'],
+                                              dtype=float)
+        self.df_frame_corners = pd.DataFrame(None, columns=['x', 'y'],
+                                             dtype=float)
+        self.frame_to_canvas_map = None
+        self.canvas_to_frame_map = None
+        self.shape = None
         super(VideoView, self).__init__()
+
+    def reset_canvas_corners(self):
+        if self.shape is None:
+            return
+        width, height = self.shape
+        self.df_canvas_corners = pd.DataFrame([[0, 0], [width, 0],
+                                               [width, height], [0, height]],
+                                              columns=['x', 'y'], dtype=float)
+
+    def reset_frame_corners(self):
+        if self.video_sink.frame_shape is None:
+            return
+        width, height = self.video_sink.frame_shape
+        self.df_frame_corners = pd.DataFrame([[0, 0], [width, 0],
+                                              [width, height], [0, height]],
+                                              columns=['x', 'y'], dtype=float)
 
     def on_widget__configure_event(self, widget, event):
         '''
         Handle resize of Cairo drawing area.
         '''
         # Set new target size for scaled frames from video sink.
-        self.video_sink.shape = event.width, event.height
+        width, height = event.width, event.height
+        self.shape = width, height
+        self.video_sink.shape = width, height
+        self.reset_canvas_corners()
+        self.update_transforms()
         if not self._enabled:
             gtk.idle_add(self.on_frame_update, None, None)
+
+    def update_transforms(self):
+        import cv2
+
+        if (self.df_canvas_corners.shape[0] <= 0 or
+            self.df_frame_corners.shape[0] <= 0):
+            return
+
+        self.canvas_to_frame_map = cv2.findHomography(self.df_canvas_corners
+                                                      .values,
+                                                      self.df_frame_corners
+                                                      .values)[0]
+        self.frame_to_canvas_map = cv2.findHomography(self.df_frame_corners
+                                                      .values,
+                                                      self.df_canvas_corners
+                                                      .values)[0]
+        self.video_sink.transform = self.frame_to_canvas_map
 
     def create_ui(self):
         self.video_sink = VideoSink(*[self.socket_info[k]
@@ -302,8 +324,7 @@ class VideoView(GtkCairoView):
         if self.widget.window is None:
             return
         if np_frame is None:
-            cr_warped = cairo.ImageSurface(cairo.FORMAT_RGB24,
-                                           *self.video_sink.shape)
+            cr_warped = cairo.ImageSurface(cairo.FORMAT_RGB24, *self.shape)
         else:
             cr_warped, np_warped_view = np_to_cairo(np_frame)
             if not self._enabled:
@@ -362,7 +383,7 @@ class VideoView(GtkCairoView):
 
     def draw_surface(self, surface, operator=cairo.OPERATOR_OVER):
         x, y, width, height = self.widget.get_allocation()
-        if width <= 0 and height <= 0:
+        if width <= 0 and height <= 0 or self.widget.window is None:
             return
         cairo_context = self.widget.window.cairo_create()
         cairo_context.set_operator(operator)
