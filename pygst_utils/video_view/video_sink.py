@@ -513,8 +513,8 @@ def parse_args(args=None):
     log_levels = ('critical', 'error', 'warning', 'info', 'debug', 'notset')
     parser.add_argument('-l', '--log-level', type=str, choices=log_levels,
                         default='info')
-    parser.add_argument('transport')
-    parser.add_argument('host')
+    parser.add_argument('transport', nargs='?', default='tcp')
+    parser.add_argument('host', nargs='?', default='*')
     parser.add_argument('-p', '--port', default=None, type=int)
 
     args = parser.parse_args()
