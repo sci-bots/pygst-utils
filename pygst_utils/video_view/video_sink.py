@@ -68,9 +68,9 @@ class VideoInfo(SlaveView):
     def create_ui(self):
         super(VideoInfo, self).create_ui()
         self.widget.set_orientation(gtk.ORIENTATION_HORIZONTAL)
-        self.label_tag_fps = gtk.Label('Frames per second:')
+        self.label_tag_fps = gtk.Label('FPS: ')
         self.label_fps = gtk.Label()
-        self.label_tag_dropped_rate = gtk.Label('  Dropped frames/s:')
+        self.label_tag_dropped_rate = gtk.Label('  Dropped/s: ')
         self.label_dropped_rate = gtk.Label()
         self.widget.pack_start(self.label_tag_fps, False, False)
         self.widget.pack_start(self.label_fps, False, False)
