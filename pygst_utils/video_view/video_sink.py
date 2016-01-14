@@ -1,12 +1,12 @@
 from subprocess import Popen
 from datetime import datetime
 import logging
-import json
 import sys
 
 from dmf_device_ui.options import DebugView
 from pygtkhelpers.delegates import SlaveView
 from pygtkhelpers.ui.views.cairo_view import GtkCairoView
+from pygtkhelpers.ui.views import composite_surface
 from pygtkhelpers.utils import gsignal, refresh_gui
 import cairo
 import cv2
@@ -16,48 +16,10 @@ import numpy as np
 import pandas as pd
 import zmq
 
-from ..video_source import get_available_video_modes, GstVideoSourceManager
+from .mode import VideoModeSelector
 from . import np_to_cairo
 
 logger = logging.getLogger(__name__)
-
-
-class VideoModeSelector(SlaveView):
-    gsignal('video-config-selected', object)
-
-    def __init__(self, configs=None):
-        if configs is None:
-            self.configs = pd.DataFrame(get_available_video_modes())
-        else:
-            self.configs = configs
-        super(VideoModeSelector, self).__init__()
-
-    def set_configs(self, configs):
-        f_config_str = (lambda c: '[{device}] {width}x{height}\t'
-                        '{framerate:.0f}fps'.format(**c))
-
-        self.config_store.clear()
-        self.config_store.append([-1, None, 'None'])
-        for i, config_i in configs.iterrows():
-            self.config_store.append([i, config_i, f_config_str(config_i)])
-
-    def create_ui(self):
-        self.config_store = gtk.ListStore(int, object, str)
-        self.set_configs(self.configs)
-
-        self.config_combo = gtk.ComboBox(model=self.config_store)
-        renderer_text = gtk.CellRendererText()
-        self.config_combo.pack_start(renderer_text, True)
-        self.config_combo.add_attribute(renderer_text, "text", 2)
-        self.config_combo.connect("changed", self.on_config_combo_changed)
-        self.widget.pack_start(self.config_combo, False, False, 0)
-
-    def on_config_combo_changed(self, combo):
-        tree_iter = combo.get_active_iter()
-        if tree_iter is not None:
-            model = combo.get_model()
-            config = model[tree_iter][1]
-            self.emit('video-config-selected', config)
 
 
 class Transform(SlaveView):
@@ -280,19 +242,6 @@ class VideoView(GtkCairoView):
                                               [width, height], [0, height]],
                                               columns=['x', 'y'], dtype=float)
 
-    def on_widget__configure_event(self, widget, event):
-        '''
-        Handle resize of Cairo drawing area.
-        '''
-        # Set new target size for scaled frames from video sink.
-        width, height = event.width, event.height
-        self.shape = width, height
-        self.video_sink.shape = width, height
-        self.reset_canvas_corners()
-        self.update_transforms()
-        if not self._enabled:
-            gtk.idle_add(self.on_frame_update, None, None)
-
     def update_transforms(self):
         import cv2
 
@@ -324,12 +273,30 @@ class VideoView(GtkCairoView):
                                gtk.gdk.POINTER_MOTION_MASK)
 
     ###########################################################################
-    # ## Mouse event handling ##
-    def on_video_sink__frame_shape_changed(self, slave, shape):
-        # Video frame is a new shape.
-        self.reset_frame_corners()
-        self.update_transforms()
+    # ## Properties ##
+    @property
+    def enabled(self):
+        return self._enabled
 
+    ###########################################################################
+    # ## Mutators ##
+    def enable(self):
+        if self.callback_id is None:
+            self.callback_id = self.video_sink.connect('frame-update',
+                                                       self.on_frame_update)
+            self._enabled = True
+            self.emit('video-enabled')
+
+    def disable(self):
+        if self.callback_id is not None:
+            self.video_sink.disconnect(self.callback_id)
+            self.callback_id = None
+            self._enabled = False
+            self.emit('video-disabled')
+        gtk.idle_add(self.on_frame_update, None, None)
+
+    ###########################################################################
+    # ## Mouse event handling ##
     def on_widget__button_press_event(self, widget, event):
         '''
         Called when any mouse button is pressed.
@@ -346,24 +313,25 @@ class VideoView(GtkCairoView):
                                               'end_event': event.copy()})
             self.start_event = None
 
-    @property
-    def enabled(self):
-        return self._enabled
+    def on_widget__configure_event(self, widget, event):
+        '''
+        Handle resize of Cairo drawing area.
+        '''
+        # Set new target size for scaled frames from video sink.
+        width, height = event.width, event.height
+        self.shape = width, height
+        self.video_sink.shape = width, height
+        self.reset_canvas_corners()
+        self.update_transforms()
+        if not self._enabled:
+            gtk.idle_add(self.on_frame_update, None, None)
 
-    def enable(self):
-        if self.callback_id is None:
-            self.callback_id = self.video_sink.connect('frame-update',
-                                                       self.on_frame_update)
-            self._enabled = True
-            self.emit('video-enabled')
-
-    def disable(self):
-        if self.callback_id is not None:
-            self.video_sink.disconnect(self.callback_id)
-            self.callback_id = None
-            self._enabled = False
-            self.emit('video-disabled')
-        gtk.idle_add(self.on_frame_update, None, None)
+    ###########################################################################
+    # ## Slave signal handling ##
+    def on_video_sink__frame_shape_changed(self, slave, shape):
+        # Video frame is a new shape.
+        self.reset_frame_corners()
+        self.update_transforms()
 
     def on_frame_update(self, slave, np_frame):
         if self.widget.window is None:
@@ -376,38 +344,12 @@ class VideoView(GtkCairoView):
                 logging.error('got frame when not enabled')
         refresh_gui(0, 0)
 
-        combined_surface = self.composite_surface([cr_warped] + self.surfaces)
+        combined_surface = composite_surface([cr_warped] + self.surfaces)
         refresh_gui(0, 0)
         self.draw_surface(combined_surface)
 
-    def draw_to_widget_surface(self, surface):
-        x, y, width, height = self.widget.get_allocation()
-        gtk_surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, width, height)
-        surface_context = cairo.Context(gtk_surface)
-        surface_context.scale(float(width) / surface.get_width(),
-                              float(height) / surface.get_height())
-        surface_context.set_source_surface(surface)
-        surface_context.rectangle(0, 0, surface.get_width(),
-                                  surface.get_height())
-        surface_context.fill()
-        return gtk_surface
-
-    def composite_surface(self, surfaces, op=cairo.OPERATOR_OVER):
-        max_width = max([s.get_width() for s in surfaces])
-        max_height = max([s.get_height() for s in surfaces])
-
-        surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, max_width,
-                                     max_height)
-        surface_context = cairo.Context(surface)
-
-        for surface_i in surfaces:
-            surface_context.set_operator(op)
-            surface_context.set_source_surface(surface_i)
-            surface_context.rectangle(0, 0, surface_i.get_width(),
-                                      surface_i.get_height())
-            surface_context.fill()
-        return surface
-
+    ###########################################################################
+    # ## Drawing methods ##
     def get_surfaces(self):
         surface1 = cairo.ImageSurface(cairo.FORMAT_ARGB32, 320, 240)
         surface1_context = cairo.Context(surface1)
@@ -477,6 +419,8 @@ class View(SlaveView):
         self.video_slave.video_sink.connect('frame-rate-update',
                                             self.on_frame_rate_update)
 
+    ###########################################################################
+    # ## Slave signal handling ##
     def on_transform_slave__transform_reset(self, slave):
         logger.info('[View] reset transform')
         self.video_slave.reset_canvas_corners()
@@ -552,6 +496,7 @@ class View(SlaveView):
 
     def on_video_slave__video_enabled(self, slave):
         self.transform_slave.widget.set_sensitive(True)
+
 
 def find_closest(df_points, point):
     return df_points.iloc[((df_points - point) ** 2).sum(axis=1).argmin()]
