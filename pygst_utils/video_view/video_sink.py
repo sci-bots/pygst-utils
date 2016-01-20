@@ -100,7 +100,7 @@ class VideoInfo(SlaveView):
 class VideoSink(SlaveView):
     gsignal('frame-rate-update', float, float)
     gsignal('frame-update', object)
-    gsignal('frame-shape-changed', object)
+    gsignal('frame-shape-changed', object, object)
     gsignal('transform-changed', object)
 
     def __init__(self, transport, target_host, port=None):
@@ -197,8 +197,9 @@ class VideoSink(SlaveView):
         # Warp and scale
         if self.frame_shape != (width, height):
             # Frame shape has changed.
+            old_frame_shape = self.frame_shape
             self.frame_shape = width, height
-            self.emit('frame-shape-changed', self.frame_shape)
+            self.emit('frame-shape-changed', old_frame_shape, self.frame_shape)
             if self.shape is None:
                 self.shape = width, height
         np_warped = cv2.warpPerspective(np_bgr, self.transform, self.shape)
