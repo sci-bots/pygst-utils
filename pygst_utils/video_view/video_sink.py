@@ -3,10 +3,10 @@ from datetime import datetime
 import logging
 import sys
 
+from cairo_helpers.surface import composite_surface
 from dmf_device_ui.options import DebugView
 from pygtkhelpers.delegates import SlaveView
 from pygtkhelpers.ui.views.cairo_view import GtkCairoView
-from pygtkhelpers.ui.views import composite_surface
 from pygtkhelpers.utils import gsignal, refresh_gui
 import cairo
 import cv2
