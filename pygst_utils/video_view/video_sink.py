@@ -113,6 +113,7 @@ class VideoSink(SlaveView):
         self.frame_shape = None
         self._transform = np.identity(3, dtype='float32')
         self.shape = None
+        self._check_duration = 50
 
     @property
     def transform(self):
@@ -143,7 +144,8 @@ class VideoSink(SlaveView):
         status = {'frame_count': 0, 'dropped_count': 0, 'start_time':
                   datetime.now()}
         self.status = status
-        self.video_timeout_id = gtk.timeout_add(50, self.check_sockets, status)
+        self.video_timeout_id = gtk.timeout_add(self._check_duration,
+                                                self.check_sockets, status)
 
     def check_sockets(self, status):
         buf_str = None
@@ -171,6 +173,20 @@ class VideoSink(SlaveView):
                                                            #['dropped_count']),
             self.emit('frame-rate-update', status['fps'],
                       status['dropped_count'] / status['duration'])
+            if status['dropped_count'] > 0:
+                gobject.source_remove(self.video_timeout_id)
+                new_check_duration = .95e3 / status['fps']
+                self._check_duration = int(new_check_duration)
+                self.video_timeout_id = gtk.timeout_add(self._check_duration,
+                                                        self.check_sockets,
+                                                        status)
+            elif status['frame_count'] > 0:
+                gobject.source_remove(self.video_timeout_id)
+                new_check_duration = 1.05 * self._check_duration
+                self._check_duration = int(new_check_duration)
+                self.video_timeout_id = gtk.timeout_add(self._check_duration,
+                                                        self.check_sockets,
+                                                        status)
             status['frame_count'] = 0
             status['dropped_count'] = 0
             status['start_time'] = datetime.now()
