@@ -1,6 +1,5 @@
 from __future__ import division
 from collections import namedtuple
-from multiprocessing import Process, Pipe
 from pprint import pprint
 import logging
 import platform
@@ -29,6 +28,19 @@ class DeviceNotFound(Exception):
 
 
 def get_available_video_modes(**kwargs):
+    '''
+    Args
+    ----
+
+        (**kwargs) : See `query_device_extracted_caps`.
+
+    Returns
+    -------
+
+        (pandas.DataFrame) : Each frame row corresponds to an available
+            GStreamer video source configuration.  Columns include device name
+            (`device`), `width`, `height`, `framerate`, etc.
+    '''
     video_source_manager = GstVideoSourceManager()
     caps = video_source_manager.query_device_extracted_caps(**kwargs)
     video_modes = []
@@ -99,37 +111,38 @@ class GstVideoSourceManager(object):
         return '{name:s},width={width:d},height={height:d},fourcc={fourcc:s},'\
                 'framerate={framerate_num:d}/{framerate_denom:d}'.format(**extracted_cap)
 
-    def _query_device_extracted_caps(self, pipe_conn, dimensions=None,
-            framerate=None, format_=None, name=None):
+    def query_device_extracted_caps(self, **kwargs):
+        '''
+        Args
+        ----
+
+            (**kwargs) : See `get_extracted_allowed_caps`.
+
+        Returns
+        -------
+
+            (dict) : List of available capabilities configurations (format,
+                width, height, frame rate, etc.) for each GStreamer video
+                source, keyed by source name.
+        '''
         extracted_device_caps = {}
         for video_device, video_caps in self._device_iter():
             final_caps = []
-            combined_caps = video_caps.get_extracted_allowed_caps(
-                    dimensions=dimensions, framerate=framerate, format_=format_,
-                            name=name)
+            combined_caps = video_caps.get_extracted_allowed_caps(**kwargs)
             for combined_cap in combined_caps:
+                # Get list of frame rates available for capabilities
+                # configuration.
                 framerates = combined_cap['framerate']
+                # Remove `'format'` (`gst.Fourcc`) since it is also available
+                # as `'fourcc'` (`str`).
                 del combined_cap['format']
+                # Append each frame rate available for the capabilities
+                # configuration as a distinct capabilities description.
                 for framerate in framerates:
                     cap = combined_cap.copy()
                     cap['framerate'] = framerate
                     final_caps.append(cap)
             extracted_device_caps[video_device] = final_caps
-        #pipe_conn.send(extracted_device_caps)
-        return extracted_device_caps
-
-    def query_device_extracted_caps(self, dimensions=None, framerate=None, format_=None,
-            name=None):
-        #master_pipe, worker_pipe = Pipe()
-        #p = Process(target=self._query_device_extracted_caps, args=(worker_pipe,
-                #), kwargs={ 'dimensions': dimensions, 'framerate': framerate,
-                        #'format_': format_, 'name': name, })
-        #p.start()
-        #extracted_device_caps = master_pipe.recv()
-        #p.join()
-        extracted_device_caps = self._query_device_extracted_caps(None,
-                dimensions=dimensions, framerate=framerate, format_=format_,
-                        name=name)
         return extracted_device_caps
 
     def query_device_caps(self, dimensions=None, framerate=None, format_=None,
@@ -189,6 +202,19 @@ class GstVideoSourceCapabilities(object):
         return format_obj['format'].fourcc
 
     def extract_fps(self, framerate_obj):
+        '''
+        Args
+        ----
+
+            framerate_obj (gst.Fraction, gst.FractionRange) : Either a single
+                GStreamer frame rate fraction, or a range of fractions.
+
+        Returns
+        -------
+
+            (list) : One `Fps` object for each frame rate fraction (multiple if
+                `framerate_obj` is a `gst.FractionRange`).
+        '''
         framerates = []
         try:
             for fps in framerate_obj['framerate']:
@@ -196,12 +222,11 @@ class GstVideoSourceCapabilities(object):
         except TypeError:
             if isinstance(framerate_obj['framerate'], gst.FractionRange):
                 for fps in (framerate_obj['framerate'].low,
-                        framerate_obj['framerate'].high):
+                            framerate_obj['framerate'].high):
                     framerates.append(Fps(fps.num, fps.denom))
             else:
                 fps = framerate_obj['framerate']
                 framerates.append(Fps(fps.num, fps.denom))
-            #framerates.append({'num': fps.num, 'denom': fps.denom})
         return sorted(set(framerates))
 
     @property
@@ -220,9 +245,20 @@ class GstVideoSourceCapabilities(object):
     def names(self):
         return self._allowed_info['names']
 
-    def get_extracted_allowed_caps(self, dimensions=None, framerate=None, format_=None, name=None):
-        allowed_caps = self.get_allowed_caps(dimensions=dimensions,
-                framerate=framerate, format_=format_, name=name)
+    def get_extracted_allowed_caps(self, framerate=None, **kwargs):
+        '''
+        Args
+        ----
+
+            framerate (int) : Filter by frame rate.
+
+        Returns
+        -------
+
+            (list) : List of available capabilities configurations (format,
+                width, height, frame rate, etc.) for GStreamer video source.
+        '''
+        allowed_caps = self.get_allowed_caps(framerate=framerate, **kwargs)
         for cap in allowed_caps:
             if framerate:
                 cap['framerate'] = (framerate, )
@@ -232,17 +268,33 @@ class GstVideoSourceCapabilities(object):
             cap['fourcc'] = self.extract_format(cap)
         return allowed_caps
 
-    def get_allowed_caps(self, dimensions=None, framerate=None, format_=None, name=None):
+    def get_allowed_caps(self, dimensions=None, framerate=None, format_=None,
+                         name=None):
+        '''
+        Args
+        ----
+
+            dimensions (int) : Filter by dimensions.
+            framerate (int) : Filter by frame rate.
+            format_ (str) : Filter by format.
+            name (str) : Filter by fourcc name.
+
+        Returns
+        -------
+
+            (list) : List of available capabilities configurations (format,
+                width, height, frame rate, etc.) for GStreamer video source.
+        '''
         allowed_caps = self.allowed_caps[:]
         if dimensions:
             allowed_caps = [c for c in allowed_caps
-                    if dimensions == self.extract_dimensions(c)]
+                            if dimensions == self.extract_dimensions(c)]
         if framerate:
             allowed_caps = [c for c in allowed_caps
-                    if framerate in self.extract_fps(c)]
+                            if framerate in self.extract_fps(c)]
         if format_:
             allowed_caps = [c for c in allowed_caps
-                    if format_ == self.extract_format(c)]
+                            if format_ == self.extract_format(c)]
         if name:
             allowed_caps = [c for c in allowed_caps if name == c['name']]
         return allowed_caps
@@ -271,7 +323,7 @@ class FilteredInput(gst.Bin):
 
         try:
             caps = gst.Caps(caps_str)
-        except (Exception, ), why:
+        except Exception:
             traceback.print_exc()
             print 'name: {}, caps_str: "{}"'.format(name, caps_str)
             raise
@@ -330,7 +382,8 @@ def main():
     video_source_manager.query_devices(**kwargs)
     caps = video_source_manager.query_device_extracted_caps(**kwargs)
     pprint(sorted(['[%s] %s' % (getattr(device, 'name', device)[:20],
-            format_cap(c)) for device, caps in caps.items() for c in caps]))
+                                format_cap(c))
+                   for device, caps_i in caps.items() for c in caps_i]))
 
 
 if __name__ == '__main__':
