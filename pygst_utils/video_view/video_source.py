@@ -1,3 +1,4 @@
+from argparse import ArgumentParser
 from datetime import datetime
 import json
 import logging
@@ -44,6 +45,8 @@ def main(pipeline_command, transport, host, port=None):
 
 
 def pipeline_command_from_json(json_source):
+    # Import here, since importing `gst` before calling `parse_args` causes
+    # command-line help to be overridden by GStreamer help.
     from ..video_source.caps import VIDEO_SOURCE_PLUGIN, DEVICE_KEY
 
     # Set `(red|green|blue)_mask` to ensure RGB channel order for both YUY2
@@ -77,7 +80,6 @@ def update_status(status):
 
 def parse_args(args=None):
     """Parses arguments, returns (options, args)."""
-    from argparse import ArgumentParser
 
     if args is None:
         args = sys.argv
@@ -85,13 +87,14 @@ def parse_args(args=None):
     parser = ArgumentParser(description='GStreamer to ZeroMQ socket.')
     log_levels = ('critical', 'error', 'warning', 'info', 'debug', 'notset')
 
-    parser.add_argument('-i', '--interactive', action='store_true', help='Do '
-                        'not start main loop.')
-    parser.add_argument('-l', '--log-level', type=str, choices=log_levels,
+    parser_pipeline = ArgumentParser(add_help=False)
+    parser_pipeline.add_argument('-i', '--interactive', action='store_true',
+                                 help='Do not start main loop.')
+    parser_pipeline.add_argument('-l', '--log-level', type=str, choices=log_levels,
                         default='info')
-    parser.add_argument('transport')
-    parser.add_argument('host')
-    parser.add_argument('-p', '--port', default=None)
+    parser_pipeline.add_argument('transport')
+    parser_pipeline.add_argument('host')
+    parser_pipeline.add_argument('-p', '--port', default=None)
 
     default_pipeline = [
         'autovideosrc name=video-source', '!',
@@ -110,7 +113,8 @@ def parse_args(args=None):
     subparsers = parser.add_subparsers(help='sub-command help', dest='command')
 
     parser_launch = subparsers.add_parser('launch', help='Configure pipeline '
-                                          'using `gst-launch` syntax.')
+                                          'using `gst-launch` syntax.',
+                                          parents=[parser_pipeline])
     parser_launch.add_argument('pipeline', nargs='?',
                                default=default_pipeline_command,
                                help='Default: %(default)s')
@@ -118,13 +122,23 @@ def parse_args(args=None):
     parser_json = subparsers.add_parser('fromjson', help='Configure pipeline'
                                         'from json object including: '
                                         'device_name, width, height, '
-                                        'framerate_num, framerate_denom')
+                                        'framerate_num, framerate_denom',
+                                        parents=[parser_pipeline])
     parser_json.add_argument('json', help='JSON object including: '
                              'device_name, width, height, framerate_num, '
                              'framerate_denom')
 
+    subparsers.add_parser('device_list', help='List available device names')
+
+    parser_device_caps = subparsers.add_parser('device_caps', help='List '
+                                               'JSON serialized capabilities '
+                                               'for device (compatible with '
+                                               '`fromjson` subcommand).')
+    parser_device_caps.add_argument('device_name')
+
     args = parser.parse_args()
-    args.log_level = getattr(logging, args.log_level.upper())
+    if hasattr(args, 'log_level'):
+        args.log_level = getattr(logging, args.log_level.upper())
     return args
 
 
@@ -134,6 +148,17 @@ if __name__ == "__main__":
         pipeline_command = args.pipeline
     elif args.command == 'fromjson':
         pipeline_command = pipeline_command_from_json(json.loads(args.json))
+    elif args.command == 'device_list':
+        from ..video_source.caps import get_video_source_names
+        print '\n'.join(get_video_source_names())
+        raise SystemExit
+    elif args.command == 'device_caps':
+        from ..video_source.caps import (expand_allowed_capabilities,
+                                         get_allowed_capabilities)
+        df_allowed_caps = get_allowed_capabilities(args.device_name)
+        df_source_caps = expand_allowed_capabilities(df_allowed_caps)
+        print '\n'.join([c.to_json() for i, c in df_source_caps.iterrows()])
+        raise SystemExit
     pipeline, status = main(pipeline_command, args.transport, args.host,
                             args.port)
 
