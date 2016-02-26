@@ -223,4 +223,4 @@ def get_source_capabilities(video_source_names=None):
         df_source_caps_i.insert(0, 'device_name', device_name_i)
         frames.append(df_source_caps_i)
 
-    return pd.concat(frames)
+    return pd.concat(frames).reset_index(drop=True)
