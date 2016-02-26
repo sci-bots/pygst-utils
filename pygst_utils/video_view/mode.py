@@ -3,7 +3,7 @@ from pygtkhelpers.delegates import SlaveView
 import gtk
 import pandas as pd
 
-from ..video_source import get_available_video_modes, DeviceNotFound
+from ..video_source.caps import get_source_capabilities, DeviceNotFound
 
 
 class VideoModeSelector(SlaveView):
@@ -12,7 +12,7 @@ class VideoModeSelector(SlaveView):
     def __init__(self, configs=None):
         if configs is None:
             try:
-                self.configs = pd.DataFrame(get_available_video_modes())
+                self.configs = get_source_capabilities()
             except DeviceNotFound:
                 self.configs = pd.DataFrame(None)
         else:
@@ -20,7 +20,7 @@ class VideoModeSelector(SlaveView):
         super(VideoModeSelector, self).__init__()
 
     def set_configs(self, configs):
-        f_config_str = (lambda c: '[{device}] {width}x{height}\t'
+        f_config_str = (lambda c: '[{device_name}] {width}x{height}\t'
                         '{framerate:.0f}fps'.format(**c))
 
         self.config_store.clear()

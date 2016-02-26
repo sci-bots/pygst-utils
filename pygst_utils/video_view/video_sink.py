@@ -207,9 +207,6 @@ class VideoSink(SlaveView):
         im_buf = np.frombuffer(buf_str, dtype='uint8',
                                count=len(buf_str)).reshape(height, width, -1)
 
-        # Cairo surface seems to use BGR ordering, so convert frame color.
-        np_bgr = cv2.cvtColor(im_buf, cv2.COLOR_RGB2BGR)
-
         # Warp and scale
         if self.frame_shape != (width, height):
             # Frame shape has changed.
@@ -218,7 +215,7 @@ class VideoSink(SlaveView):
             self.emit('frame-shape-changed', old_frame_shape, self.frame_shape)
             if self.shape is None:
                 self.shape = width, height
-        np_warped = cv2.warpPerspective(np_bgr, self.transform, self.shape)
+        np_warped = cv2.warpPerspective(im_buf, self.transform, self.shape)
         self.emit('frame-update', np_warped)
 
 
