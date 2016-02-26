@@ -20,7 +20,7 @@ kw = {'name': "pygst_utils",
       'license': "GPLv2 License",
       'packages': ['pygst_utils', 'pygst_utils.bin', 'pygst_utils.elements',
                    'pygst_utils.video_mode', 'pygst_utils.video_pipeline',
-                   'pygst_utils.video_source', 'pygst_utils.video_view'],
+                   'pygst_utils.video_view'],
       'cmdclass': dict(build_py=build_py)}
 
 
