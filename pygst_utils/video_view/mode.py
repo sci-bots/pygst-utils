@@ -3,7 +3,7 @@ from pygtkhelpers.delegates import SlaveView
 import gtk
 import pandas as pd
 
-from ..video_source.caps import get_source_capabilities, DeviceNotFound
+from ..video_source import get_source_capabilities, DeviceNotFound
 
 
 class VideoModeSelector(SlaveView):

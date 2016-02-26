@@ -11,8 +11,6 @@ logger = logging.getLogger(__name__)
 
 
 def main(pipeline_command, transport, host, port=None):
-    import pygst
-    pygst.require("0.10")
     import gst
 
     uri = '%s://%s:%s' % (transport, host, port)
@@ -47,7 +45,7 @@ def main(pipeline_command, transport, host, port=None):
 def pipeline_command_from_json(json_source):
     # Import here, since importing `gst` before calling `parse_args` causes
     # command-line help to be overridden by GStreamer help.
-    from ..video_source.caps import VIDEO_SOURCE_PLUGIN, DEVICE_KEY
+    from ..video_source import VIDEO_SOURCE_PLUGIN, DEVICE_KEY
 
     # Set `(red|green|blue)_mask` to ensure RGB channel order for both YUY2
     # and I420 video sources.  If this is not done, red and blue channels
@@ -149,12 +147,12 @@ if __name__ == "__main__":
     elif args.command == 'fromjson':
         pipeline_command = pipeline_command_from_json(json.loads(args.json))
     elif args.command == 'device_list':
-        from ..video_source.caps import get_video_source_names
+        from ..video_source import get_video_source_names
         print '\n'.join(get_video_source_names())
         raise SystemExit
     elif args.command == 'device_caps':
-        from ..video_source.caps import (expand_allowed_capabilities,
-                                         get_allowed_capabilities)
+        from ..video_source import (expand_allowed_capabilities,
+                                    get_allowed_capabilities)
         df_allowed_caps = get_allowed_capabilities(args.device_name)
         df_source_caps = expand_allowed_capabilities(df_allowed_caps)
         print '\n'.join([c.to_json() for i, c in df_source_caps.iterrows()])
