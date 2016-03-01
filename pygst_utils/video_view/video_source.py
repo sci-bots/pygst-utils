@@ -17,8 +17,7 @@ def main(pipeline_command, transport, host, port=None):
     ctx = zmq.Context.instance()
     socket = zmq.Socket(ctx, zmq.PUSH)
     socket.connect(uri)
-
-    pipeline = gst.parse_launch(pipeline_command)
+    pipeline = gst.parse_launch(unicode(pipeline_command).encode('utf-8'))
     app = pipeline.get_by_name('app-video')
     status = {'frame_count': 0}
 
@@ -54,13 +53,13 @@ def pipeline_command_from_json(json_source):
     # See [here][1] for default mask values.
     #
     # [1]: https://www.freedesktop.org/software/gstreamer-sdk/data/docs/latest/gst-plugins-bad-plugins-0.10/gst-plugins-bad-plugins-videoparse.html#GstVideoParse--blue-mask
-    caps_str = ('video/x-raw-rgb,width={width:d},height={height:d},'
-                'red_mask=(int)255,green_mask=(int)65280,'
-                'blue_mask=(int)16711680,'
-                'framerate={framerate_num:d}/{framerate_denom:d}'
+    caps_str = (u'video/x-raw-rgb,width={width:d},height={height:d},'
+                u'red_mask=(int)255,green_mask=(int)65280,'
+                u'blue_mask=(int)16711680,'
+                u'framerate={framerate_num:d}/{framerate_denom:d}'
                 .format(**json_source))
-    device_str = '{} {}="{}"'.format(VIDEO_SOURCE_PLUGIN, DEVICE_KEY,
-                                     json_source['device_name'])
+    device_str = u'{} {}="{}"'.format(VIDEO_SOURCE_PLUGIN, DEVICE_KEY,
+                                      json_source['device_name'])
     logging.info('[View] video config device string: %s', device_str)
     logging.info('[View] video config caps string: %s', caps_str)
 
@@ -145,7 +144,8 @@ if __name__ == "__main__":
     if args.command == 'launch':
         pipeline_command = args.pipeline
     elif args.command == 'fromjson':
-        pipeline_command = pipeline_command_from_json(json.loads(args.json))
+        json_config = json.loads(args.json)
+        pipeline_command = pipeline_command_from_json(json_config)
     elif args.command == 'device_list':
         from ..video_source import get_video_source_names
         print '\n'.join(get_video_source_names())
