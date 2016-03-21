@@ -1,9 +1,12 @@
 from __future__ import division
-from pprint import pprint
 from multiprocessing import Process, Pipe
-import time
+from pprint import pprint
 import logging
+import time
 
+from pygtkhelpers.ui.extra_dialogs import field_entry_dialog
+from pygtkhelpers.ui.extra_widgets import Enum, Form
+from pygtkhelpers.ui.form_view_dialog import create_form_view
 try:
     import pygst
     pygst.require("0.10")
@@ -12,11 +15,10 @@ except:
 finally:
     import gst
 import glib
-from ..video_source import GstVideoSourceManager, FilteredInput,\
-        get_available_video_modes, get_video_source_configs, DeviceNotFound
-from pygtkhelpers.ui.extra_widgets import Enum, Form
-from pygtkhelpers.ui.form_view_dialog import create_form_view
-from pygtkhelpers.ui.extra_dialogs import field_entry_dialog
+
+from ..video_source import (DeviceNotFound, FilteredInput,
+                            GstVideoSourceManager, get_available_video_modes,
+                            get_video_source_configs)
 
 
 def get_video_mode_enum(video_modes=None):
@@ -29,14 +31,27 @@ def get_video_mode_enum(video_modes=None):
 
 
 def get_video_mode_map(video_modes=None):
+    '''
+    Args
+    ----
+
+        video_modes (pandas.DataFrame) : Table of video modes, including the
+            columns: `device`, `width`, `height`, `fourcc`, and `framerate`.
+
+    Returns
+    -------
+
+        (dict): `pandas.Series` video configurations keyed by corresponding
+            human-readable string label.
+    '''
     if video_modes is None:
-        video_modes = get_available_video_modes(
-                format_='YUY2')
-    format_cap = lambda c: '[%s] ' % getattr(c['device'], 'name',
-            c['device'])[:20] + '{width:4d}x{height:d} {fps:2.0f}fps '\
-                    '({fourcc:s})'.format(
-                            fps=c['framerate'].num / c['framerate'].denom, **c)
-    video_mode_map = dict([(format_cap(c), c) for c in video_modes])
+        video_modes = get_available_video_modes(format_='YUY2')
+    format_cap = (lambda c: '[%s] ' % getattr(c['device'], 'name',
+                                              c['device'])[:20] +
+                  '{width:4d}x{height:d} {framerate:2.0f}fps '\
+                  '({fourcc:s})'.format(**c))
+    video_mode_map = dict([(format_cap(c), c)
+                           for i, c in video_modes.iterrows()])
     return video_mode_map
 
 
@@ -63,8 +78,7 @@ def select_video_caps():
 
 def get_video_mode_form(video_modes=None):
     if video_modes is None:
-        video_modes = get_available_video_modes(
-                format_='YUY2')
+        video_modes = get_available_video_modes(format_='YUY2')
     video_mode_map = get_video_mode_map(video_modes)
     video_keys = sorted(video_mode_map.keys())
     form = Form.of(Enum.named('video_mode').valued(
@@ -255,14 +269,13 @@ class GStreamerProcess(object):
 
     def get_available_video_modes(self, **kwargs):
         self.master_pipe.send({'command': 'get_available_video_modes',
-                'kwargs': kwargs, 'ack': True})
+                               'kwargs': kwargs, 'ack': True})
         response = self.master_pipe.recv()
         return response['result']
 
     def get_video_mode_form(self, video_modes=None):
         if video_modes is None:
-            video_modes = self.get_available_video_modes(
-                    format_='YUY2')
+            video_modes = self.get_available_video_modes(format_='YUY2')
         video_mode_map = get_video_mode_map(video_modes)
         video_keys = sorted(video_mode_map.keys())
         form = Form.of(Enum.named('video_mode').valued(
@@ -271,8 +284,7 @@ class GStreamerProcess(object):
 
     def get_video_mode_enum(self, video_modes=None):
         if video_modes is None:
-            video_modes = self.get_available_video_modes(
-                    format_='YUY2')
+            video_modes = self.get_available_video_modes(format_='YUY2')
         video_mode_map = get_video_mode_map(video_modes)
         video_keys = sorted(video_mode_map.keys())
         return Enum.named('video_mode').valued(*video_keys)
