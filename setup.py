@@ -21,6 +21,7 @@ kw = {'name': "pygst_utils",
       'packages': ['pygst_utils', 'pygst_utils.bin', 'pygst_utils.elements',
                    'pygst_utils.video_mode', 'pygst_utils.video_pipeline',
                    'pygst_utils.video_view'],
+      'install_requires': ['redirect-io'],
       'cmdclass': dict(build_py=build_py)}
 
 

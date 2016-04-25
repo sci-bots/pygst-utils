@@ -6,6 +6,7 @@ import sys
 
 from zmq.eventloop import ioloop
 import zmq
+from .. import pipeline_command_from_json
 
 logger = logging.getLogger(__name__)
 
@@ -39,33 +40,6 @@ def main(pipeline_command, transport, host, port=None):
     pipeline.set_state(gst.STATE_PAUSED)
     pipeline.set_state(gst.STATE_PLAYING)
     return pipeline, status
-
-
-def pipeline_command_from_json(json_source):
-    # Import here, since importing `gst` before calling `parse_args` causes
-    # command-line help to be overridden by GStreamer help.
-    from ..video_source import VIDEO_SOURCE_PLUGIN, DEVICE_KEY
-
-    # Set `(red|green|blue)_mask` to ensure RGB channel order for both YUY2
-    # and I420 video sources.  If this is not done, red and blue channels
-    # might be swapped.
-    #
-    # See [here][1] for default mask values.
-    #
-    # [1]: https://www.freedesktop.org/software/gstreamer-sdk/data/docs/latest/gst-plugins-bad-plugins-0.10/gst-plugins-bad-plugins-videoparse.html#GstVideoParse--blue-mask
-    caps_str = (u'video/x-raw-rgb,width={width:d},height={height:d},'
-                u'red_mask=(int)255,green_mask=(int)65280,'
-                u'blue_mask=(int)16711680,'
-                u'framerate={framerate_num:d}/{framerate_denom:d}'
-                .format(**json_source))
-    device_str = u'{} {}="{}"'.format(VIDEO_SOURCE_PLUGIN, DEVICE_KEY,
-                                      json_source['device_name'])
-    logging.info('[View] video config device string: %s', device_str)
-    logging.info('[View] video config caps string: %s', caps_str)
-
-    video_command = ''.join([device_str, ' ! ffmpegcolorspace ! ', caps_str,
-                             ' ! appsink name=app-video emit-signals=true'])
-    return video_command
 
 
 def update_status(status):
