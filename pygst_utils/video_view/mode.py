@@ -3,7 +3,9 @@ from pygtkhelpers.delegates import SlaveView
 import gtk
 import pandas as pd
 
-from ..video_source import get_source_capabilities, DeviceNotFound
+from redirect_io import nostderr
+with nostderr():
+    from ..video_source import get_source_capabilities, DeviceNotFound
 
 
 class VideoModeSelector(SlaveView):
@@ -19,15 +21,6 @@ class VideoModeSelector(SlaveView):
             self.configs = configs
         super(VideoModeSelector, self).__init__()
 
-    def set_configs(self, configs):
-        f_config_str = (lambda c: '[{device_name}] {width}x{height}\t'
-                        '{framerate:.0f}fps'.format(**c))
-
-        self.config_store.clear()
-        self.config_store.append([-1, None, 'None'])
-        for i, config_i in configs.iterrows():
-            self.config_store.append([i, config_i, f_config_str(config_i)])
-
     def create_ui(self):
         self.config_store = gtk.ListStore(int, object, str)
         self.set_configs(self.configs)
@@ -39,9 +32,57 @@ class VideoModeSelector(SlaveView):
         self.config_combo.connect("changed", self.on_config_combo_changed)
         self.widget.pack_start(self.config_combo, False, False, 0)
 
+    def set_configs(self, configs):
+        f_config_str = (lambda c: '[{device_name}] {width}x{height}\t'
+                        '{framerate:.0f}fps'.format(**c))
+
+        self.config_store.clear()
+        self.config_store.append([-1, None, 'None'])
+        for i, config_i in configs.iterrows():
+            self.config_store.append([i, config_i, f_config_str(config_i)])
+
+    ###########################################################################
+    # Callback methods
     def on_config_combo_changed(self, combo):
-        tree_iter = combo.get_active_iter()
+        config = self.get_active_config()
+        self.emit('video-config-selected', config)
+
+    ###########################################################################
+    # Accessor methods
+    def get_active_config(self):
+        tree_iter = self.config_combo.get_active_iter()
         if tree_iter is not None:
-            model = combo.get_model()
-            config = model[tree_iter][1]
-            self.emit('video-config-selected', config)
+            model = self.config_combo.get_model()
+            return model[tree_iter][1]
+
+
+def video_mode_dialog(df_video_configs=None, title='Select video mode'):
+    '''
+    Args
+    ----
+
+        df_video_configs (pandas.DataFrame) : Table of video configurations in
+            format returned by `..video_source.get_source_capabilities`.
+        title (str) : Title to display in video selection dialog.
+
+    Returns
+    -------
+
+        (pandas.Series) : Row from `df_video_configs` corresponding to selected
+            video configuration.  Returns `None` if dialog is cancelled or no
+            configuration was selected.
+    '''
+    mode_selector = VideoModeSelector(df_video_configs)
+    dialog = gtk.Dialog(title=title, buttons=(gtk.STOCK_OK, gtk.RESPONSE_OK,
+                                              gtk.STOCK_CANCEL,
+                                              gtk.RESPONSE_CANCEL))
+    dialog.get_content_area().pack_start(mode_selector.widget, True, False, 15)
+    mode_selector.widget.show_all()
+    response = dialog.run()
+    config = mode_selector.get_active_config()
+    dialog.destroy()
+
+    if response == gtk.RESPONSE_OK:
+        return config
+    else:
+        raise RuntimeError('Dialog cancelled.')
