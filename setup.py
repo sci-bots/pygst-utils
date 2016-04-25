@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import distutils.core
+import platform
 
 try:
     from distutils.command.build_py import build_py_2to3 as build_py
@@ -8,6 +9,19 @@ except ImportError:
     from distutils.command.build_py import build_py
 
 import version
+
+
+install_requires = ['redirect-io', 'wheeler.pygtkhelpers']
+
+# Platform-specific package requirements.
+if platform.system() == 'Windows':
+    install_requires += ['pygst-0.10-win']
+else:
+    try:
+        import gst
+    except ImportError:
+        print >> sys.err, ('Please install GStreamer Python bindings using '
+                           'your systems package manager.')
 
 
 # Setup script for path
@@ -21,9 +35,8 @@ kw = {'name': "pygst_utils",
       'packages': ['pygst_utils', 'pygst_utils.bin', 'pygst_utils.elements',
                    'pygst_utils.video_mode', 'pygst_utils.video_pipeline',
                    'pygst_utils.video_view'],
-      'install_requires': ['redirect-io'],
+      'install_requires': install_requires,
       'cmdclass': dict(build_py=build_py)}
-
 
 # If we're running Python 2.3, add extra information
 if hasattr(distutils.core, 'setup_keywords'):
