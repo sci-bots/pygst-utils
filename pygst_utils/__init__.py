@@ -90,9 +90,8 @@ def get_available_video_source_configs():
     device_names = get_video_source_names()
     frames = []
     for device_name_i in device_names:
-        device_name = device_names[0]
-        df_allowed_caps = get_allowed_capabilities(device_name)
+        df_allowed_caps = get_allowed_capabilities(device_name_i)
         df_source_caps = expand_allowed_capabilities(df_allowed_caps)
-        df_source_caps.insert(0, 'device_name', device_name)
+        df_source_caps.insert(0, 'device_name', device_name_i)
         frames.append(df_source_caps)
     return pd.concat(frames)
