@@ -39,7 +39,12 @@ class VideoModeSelector(SlaveView):
         self.config_store.clear()
         self.config_store.append([-1, None, 'None'])
         for i, config_i in configs.iterrows():
-            self.config_store.append([i, config_i, f_config_str(config_i)])
+            label_config_i = config_i.copy()
+            if len(label_config_i.device_name) > 30:
+                label_config_i.device_name = ('...' +
+                                              label_config_i.device_name[:27])
+            self.config_store.append([i, config_i,
+                                      f_config_str(label_config_i)])
 
     ###########################################################################
     # Callback methods
