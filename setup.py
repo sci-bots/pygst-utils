@@ -1,7 +1,7 @@
 #!/usr/bin/env python
-
 import distutils.core
 import platform
+import sys
 
 try:
     from distutils.command.build_py import build_py_2to3 as build_py
@@ -20,8 +20,8 @@ else:
     try:
         import gst
     except ImportError:
-        print >> sys.err, ('Please install GStreamer Python bindings using '
-                           'your systems package manager.')
+        print >> sys.stderr, ('Please install GStreamer Python bindings using '
+                              'your systems package manager.')
 
 
 # Setup script for path
