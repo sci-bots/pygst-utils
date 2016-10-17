@@ -11,7 +11,7 @@ except ImportError:
 import version
 
 
-install_requires = ['redirect-io', 'wheeler.pygtkhelpers']
+install_requires = ['opencv_helpers', 'redirect-io', 'wheeler.pygtkhelpers']
 
 # Platform-specific package requirements.
 if platform.system() == 'Windows':

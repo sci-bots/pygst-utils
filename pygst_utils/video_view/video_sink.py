@@ -5,11 +5,11 @@ import sys
 
 from cairo_helpers.surface import composite_surface
 from dmf_device_ui.options import DebugView
+from opencv_helpers.safe_cv import cv2
 from pygtkhelpers.delegates import SlaveView
 from pygtkhelpers.ui.views.cairo_view import GtkCairoView
 from pygtkhelpers.utils import gsignal, refresh_gui
 import cairo
-import cv2
 import gobject
 import gtk
 import numpy as np

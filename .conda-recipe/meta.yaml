@@ -1,0 +1,24 @@
+# source will be downloaded prior to filling in jinja templates
+# Example assumes that this folder has setup.py in it
+source:
+  git_url: ../
+
+package:
+  name: pygst_utils
+{% if GIT_DESCRIBE_NUMBER > '0' %}
+  version: {{ GIT_DESCRIBE_TAG[1:] }}.post{{ GIT_DESCRIBE_NUMBER }}
+{% else %}
+  version: {{ GIT_DESCRIBE_TAG[1:] }}
+{% endif %}
+
+requirements:
+  build:
+    - python 2.7*
+    - pygst-0.10
+    - redirect-io
+    - wheeler.pygtkhelpers
+
+  run:
+    - pygst-0.10
+    - redirect-io
+    - wheeler.pygtkhelpers
