@@ -14,11 +14,13 @@ package:
 requirements:
   build:
     - python 2.7*
+    - opencv-helpers >=0.1.post1
     - pygst-0.10
     - redirect-io
     - wheeler.pygtkhelpers
 
   run:
+    - opencv-helpers >=0.1.post1
     - pygst-0.10
     - redirect-io
     - wheeler.pygtkhelpers
