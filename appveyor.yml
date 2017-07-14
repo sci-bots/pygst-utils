@@ -5,12 +5,15 @@ environment:
       MINICONDA: C:\Miniconda
       PYTHON_ARCH: "32"
 
-version: '1.0.{build}'
+version: "- powershell $(git describe --tags).split('-')[0..1] -join '.'"
 
 init:
   - "ECHO %PYTHON_VERSION% %MINICONDA%"
 
 install:
+  # Exit if no .conda-recipe folder
+  - IF NOT EXIST .conda-recipe exit 1
+
   - git clone --depth=1 https://github.com/sci-bots/sci-bots-configs.git
   - .\sci-bots-configs\appveyor-install.bat
 
