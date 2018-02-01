@@ -37,7 +37,7 @@ def get_video_source_names():
             video_source = gst.element_factory_make(VIDEO_SOURCE_PLUGIN,
                                                     'video_source')
             devices = video_source.probe_get_values_name(DEVICE_KEY)
-        except:
+        except Exception:
             devices = []
         if not devices:
             raise DeviceNotFound('No devices available')
