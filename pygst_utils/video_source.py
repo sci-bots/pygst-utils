@@ -222,7 +222,7 @@ def get_source_capabilities(video_source_names=None):
 
 
     .. versionchanged:: X.X.X
-        Handle sources with no allowed capabilities.
+        Handle no sources available and sources with no allowed capabilities.
     '''
     if video_source_names is None:
         video_source_names = get_video_source_names()
@@ -237,5 +237,7 @@ def get_source_capabilities(video_source_names=None):
         df_source_caps_i = expand_allowed_capabilities(df_allowed_caps_i)
         df_source_caps_i.insert(0, 'device_name', device_name_i)
         frames.append(df_source_caps_i)
-
-    return pd.concat(frames).reset_index(drop=True)
+    if frames:
+        return pd.concat(frames).reset_index(drop=True)
+    else:
+        return pd.DataFrame()
