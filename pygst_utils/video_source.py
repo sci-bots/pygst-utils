@@ -1,4 +1,6 @@
 # coding: utf-8
+import logging
+
 from path_helpers import path
 import gst
 import pandas as pd
@@ -57,6 +59,10 @@ def get_allowed_capabilities(device_name):
              (e.g., `gst.Fourcc, gst.Fraction`, etc.).  See `expand_allowed_capabilities`
              to convert output of this function to data frame using only basic types
              (i.e., string and numeric data types).
+
+
+    .. versionchanged:: X.X.X
+        Handle sources with no allowed capabilities.
     '''
     pipeline = gst.Pipeline()
 
@@ -64,7 +70,6 @@ def get_allowed_capabilities(device_name):
     video_source.set_property(DEVICE_KEY, device_name)
 
     source_pad = video_source.get_pad('src')
-    #video_sink = gst.element_factory_make('fakesink', 'video_sink')
     video_sink = gst.element_factory_make('autovideosink', 'video_sink')
     pipeline.add(video_source)
     pipeline.add(video_sink)
@@ -75,6 +80,9 @@ def get_allowed_capabilities(device_name):
                                                                c.get_name())])
                         for c in source_pad.get_allowed_caps()]
         pipeline.set_state(gst.STATE_NULL)
+    except gst.LinkError:
+        logging.debug('Unable to link to %s to get capabilities', device_name)
+        allowed_caps = []
     finally:
         del pipeline
 
@@ -211,6 +219,10 @@ def get_source_capabilities(video_source_names=None):
         (pandas.DataFrame) : One row per available video source configuration.
             Columns include: `['device_name', 'width', 'height', 'fourcc',
             'name', 'framerate_num', 'framerate_denom', 'framerate']`.
+
+
+    .. versionchanged:: X.X.X
+        Handle sources with no allowed capabilities.
     '''
     if video_source_names is None:
         video_source_names = get_video_source_names()
@@ -219,6 +231,9 @@ def get_source_capabilities(video_source_names=None):
 
     for device_name_i in video_source_names:
         df_allowed_caps_i = get_allowed_capabilities(device_name_i)
+        if not df_allowed_caps_i.shape[0]:
+            # No allowed caps for the device
+            continue
         df_source_caps_i = expand_allowed_capabilities(df_allowed_caps_i)
         df_source_caps_i.insert(0, 'device_name', device_name_i)
         frames.append(df_source_caps_i)
