@@ -23,9 +23,9 @@ def get_video_source_names():
     '''
     Returns
     -------
-
-         (list) : List of names (`str`) of video source devices available
-             for use with GStreamer.
+    list
+        List of names (:class:`str`) of video source devices available for use
+        with GStreamer.
     '''
     if platform.system() == 'Linux':
         try:
@@ -46,19 +46,21 @@ def get_video_source_names():
 
 def get_allowed_capabilities(device_name):
     '''
-    Args
-    ----
-
-        device_name (str) : Name of device to query.
+    Parameters
+    ----------
+    device_name : str
+        Name of device to query.
 
     Returns
     -------
+    pandas.DataFrame
+        Video source capabilities queried from source pad of device with
+        specified device name.  Columns contain GStreamer data types (e.g.,
+        :class:`gst.Fourcc`, :class:`gst.Fraction`, etc.).
 
-         (pandas.DataFrame) : Video source capabilities queried from source pad
-             of device with specified device name.  Columns contain GStreamer data types
-             (e.g., `gst.Fourcc, gst.Fraction`, etc.).  See `expand_allowed_capabilities`
-             to convert output of this function to data frame using only basic types
-             (i.e., string and numeric data types).
+        See :func:`expand_allowed_capabilities` to convert output of this
+        function to data frame using only basic types (i.e., string and numeric
+        data types).
 
 
     .. versionchanged:: X.X.X
@@ -91,16 +93,16 @@ def get_allowed_capabilities(device_name):
 
 def extract_dimensions(dimensions_obj):
     '''
-    Args
-    ----
-
-        dimensions_obj (pandas.Series) : Width and height.
+    Parameters
+    ----------
+    dimensions_obj : pandas.Series
+        Width and height.
 
     Returns
     -------
-
-        (pandas.Series) : Replace width/height values in `gst.IntRange` form
-            with maximum value in range.
+    pandas.Series
+        Replace width/height values in :class:`gst.IntRange` form with maximum
+        value in range.
     '''
     for field in ['width', 'height']:
         if isinstance(dimensions_obj[field], gst.IntRange):
@@ -110,33 +112,34 @@ def extract_dimensions(dimensions_obj):
 
 def extract_format(format_obj):
     '''
-    Args
-    ----
+    Parameters
+    ----------
+    format_obj : gst.Fourcc
+        Four CC video format code.
 
-        format_obj (gst.Fourcc) : Four CC video format code.
-            TODO: Add URL to four CC format list.
+        See `list of FOURCC codes <https://www.fourcc.org/codecs.php>`.
 
     Returns
     -------
-
-        (str) : Four CC code as four character string.
+    str
+        Four CC code as four character string.
     '''
     return format_obj.fourcc
 
 
 def extract_fps(framerate_obj):
     '''
-    Args
-    ----
-
-        framerate_obj (gst.Fraction, gst.FractionRange) : Either a single
-            GStreamer frame rate fraction, or a range of fractions.
+    Parameters
+    ----------
+    framerate_obj : gst.Fraction, gst.FractionRange
+        Either a single GStreamer frame rate fraction, or a range of fractions.
 
     Returns
     -------
-
-        (list) : One `Fps` object for each frame rate fraction (multiple if
-            `framerate_obj` is a `gst.FractionRange`).
+    list
+        One fractional frames-per-second tuple
+        (i.e., ``(numerator, denominator``) for each frame rate fraction
+        (multiple if :data:`framerate_obj` is a :class:`gst.FractionRange`).
     '''
     framerates = []
     try:
@@ -160,18 +163,18 @@ def expand_allowed_capabilities(df_allowed_caps):
     For example, `format` in `df_allowed_caps` is of type `gst.Fourcc`, but can
     simply be converted to a string of four characters.
 
-    Args
-    ----
-
-        df_allowed_caps (pandas.DataFrame) : Video capabilities configurations
-            in form returned by `get_allowed_capabilities` function.
+    Parameters
+    ----------
+    df_allowed_caps : pandas.DataFrame
+        Video capabilities configurations in form returned by
+        :func:`get_allowed_capabilities`.
 
     Returns
     -------
-
-        (pandas.DataFrame) : One row per video configuration containing only
-            basic string or numeric data types.  Also, lists of frame rates in
-            `df_allowed_caps` are expanded to multiple rows.
+    pandas.DataFrame
+        One row per video configuration containing only basic string or numeric
+        data types.  Also, lists of frame rates in :data:`df_allowed_caps` are
+        expanded to multiple rows.
     '''
     df_modes = df_allowed_caps.copy().drop(['framerate', 'width', 'height',
                                             'format'], axis=1)
@@ -207,18 +210,16 @@ def expand_allowed_capabilities(df_allowed_caps):
 
 def get_source_capabilities(video_source_names=None):
     '''
-    Args
-    ----
-
-        video_source_names (list) : List of video source names.  See
-            `get_video_source_names` function to query available device names.
+    Parameters
+    ----------
+    video_source_names : list
+        List of video source names.  See :func:`get_video_source_names`
+        function to query available device names.
 
     Returns
     -------
-
-        (pandas.DataFrame) : One row per available video source configuration.
-            Columns include: `['device_name', 'width', 'height', 'fourcc',
-            'name', 'framerate_num', 'framerate_denom', 'framerate']`.
+    pandas.DataFrame
+        One row per available video source configuration.
 
 
     .. versionchanged:: X.X.X
