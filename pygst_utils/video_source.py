@@ -63,7 +63,7 @@ def get_allowed_capabilities(device_name):
         data types).
 
 
-    .. versionchanged:: X.X.X
+    .. versionchanged:: 0.3.2
         Handle sources with no allowed capabilities.
     '''
     pipeline = gst.Pipeline()
@@ -222,7 +222,7 @@ def get_source_capabilities(video_source_names=None):
         One row per available video source configuration.
 
 
-    .. versionchanged:: X.X.X
+    .. versionchanged:: 0.3.2
         Handle no sources available and sources with no allowed capabilities.
     '''
     if video_source_names is None:
