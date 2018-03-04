@@ -1,3 +1,8 @@
+{% if GIT_DESCRIBE_NUMBER > '0' %}
+{% set GIT_VERSION = GIT_DESCRIBE_TAG[1:] + '.post' + GIT_DESCRIBE_NUMBER %}
+{% else %}
+{% set GIT_VERSION = GIT_DESCRIBE_TAG[1:] %}
+{% endif %}
 # source will be downloaded prior to filling in jinja templates
 # Example assumes that this folder has setup.py in it
 source:
@@ -5,15 +10,17 @@ source:
 
 package:
   name: pygst_utils
-{% if GIT_DESCRIBE_NUMBER > '0' %}
-  version: {{ GIT_DESCRIBE_TAG[1:] }}.post{{ GIT_DESCRIBE_NUMBER }}
-{% else %}
-  version: {{ GIT_DESCRIBE_TAG[1:] }}
-{% endif %}
+  version: {{ GIT_VERSION }}
+
+build:
+  # Only build for `win-32` Python 2.7
+  skip: true  # [not win32 or not py27]
+  number: 1
+  script: python setup.py install --single-version-externally-managed --record record.txt
 
 requirements:
   build:
-    - python 2.7*
+    - python
     - opencv-helpers >=0.1.post1
     - pygst-0.10
     - redirect-io
