@@ -81,6 +81,10 @@ def get_available_video_source_configs():
 
         (pandas.DataFrame) : Available video source configuration with highest
             width and framerate.
+
+
+    .. versionchanged:: 0.3.5
+        Skip devices with no allowed capabilities.
     '''
     with nostderr():
         from .video_source import (get_video_source_names,
@@ -91,6 +95,8 @@ def get_available_video_source_configs():
     frames = []
     for device_name_i in device_names:
         df_allowed_caps = get_allowed_capabilities(device_name_i)
+        if df_allowed_caps.shape[0] < 1:
+            continue
         df_source_caps = expand_allowed_capabilities(df_allowed_caps)
         df_source_caps.insert(0, 'device_name', device_name_i)
         frames.append(df_source_caps)
